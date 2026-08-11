@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 164 72" role="img" aria-labelledby="title desc">
+  <title id="title">Budget dashboard logo</title>
+  <desc id="desc">A gold bar chart rising inside a circular mark</desc>
+  <defs>
+    <linearGradient id="gold" x1="30" y1="12" x2="132" y2="63" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF2A8"/>
+      <stop offset="0.48" stop-color="#D4AF37"/>
+      <stop offset="1" stop-color="#B88A16"/>
+    </linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#gold)" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="82" cy="36" r="29" stroke-width="3"/>
+    <path d="M50 36c8-14 19-22 32-22 13 0 24 8 32 22-8 14-19 22-32 22-13 0-24-8-32-22Z" opacity=".22" stroke-width="1.5"/>
+    <path d="M62 50V38h10v12M77 50V29h10v21M92 50V21h10v29" stroke-width="4"/>
+    <path d="m60 32 14-8 10 2 17-12" stroke-width="3"/>
+    <path d="m95 14h6v6" stroke-width="3"/>
+  </g>
+</svg>
