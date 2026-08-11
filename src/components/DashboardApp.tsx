@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { BarChart3, Bell, Building2, ChevronRight, ClipboardList, FileBarChart, FileSpreadsheet, Gauge, Home, LineChart as LineChartIcon, PieChart as PieChartIcon, Settings, Upload, WalletCards } from 'lucide-react';
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { categories, departments, monthlyRealization, overBudgetDepartments, overBudgetValue, remainingBudget, requests, rupiah, totalActual, totalBudget, usagePercent } from '@/lib/budget-data';
@@ -20,7 +21,10 @@ const shortRupiah = (v: number) => `${Math.round(v / 1000000000)}M`;
 export default function DashboardApp() {
   return <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,#3a2a08,transparent_35%),#070707] text-slate-100">
     <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 border-r border-gold-500/20 bg-black/90 p-5 lg:block">
-      <div className="mb-8 rounded-2xl border border-gold-500/30 bg-gold-500/10 p-4"><p className="text-xs uppercase tracking-[0.35em] text-gold-300">BudgetPro</p><h1 className="mt-1 text-xl font-bold text-white">Black Gold</h1></div>
+      <div className="mb-8 flex flex-col items-center pt-2 text-center">
+        <Image src="/assets/lool-logo.svg" alt="LOOL" width={110} height={82} priority className="h-auto w-[110px] object-contain" />
+        <p className="mt-2 max-w-full text-sm font-semibold leading-5 text-gold-500">Budgeting 1001 &amp; Maison Y</p>
+      </div>
       <nav className="space-y-2">{menu.map(([label, Icon], index) => <a key={label} href={`#${label.toLowerCase().replaceAll(' ', '-')}`} className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition hover:bg-gold-500/15 hover:text-gold-100 ${index === 0 ? 'bg-gold-500 text-black font-semibold' : 'text-zinc-300'}`}><Icon className="h-5 w-5" />{label}</a>)}</nav>
     </aside>
     <main className="lg:pl-72">

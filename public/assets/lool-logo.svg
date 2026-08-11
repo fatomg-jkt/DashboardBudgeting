@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 164" role="img" aria-labelledby="title desc">
+  <title id="title">LOOL</title>
+  <desc id="desc">LOOL heart symbol and script wordmark</desc>
+  <g fill="none" stroke="#D4AF37" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M110 72C91 50 72 31 48 31 28 31 15 45 15 62c0 31 42 48 95 73 53-25 95-42 95-73 0-17-13-31-33-31-24 0-43 19-62 41Z" stroke-width="8"/>
+    <path d="M110 72C91 94 72 113 48 113 28 113 15 99 15 82c0-17 13-31 33-31 24 0 43 19 62 41 19-22 38-41 62-41 20 0 33 14 33 31 0 17-13 31-33 31-24 0-43-19-62-41Z" stroke-width="8"/>
+    <path d="M48 143c13-11 24-18 31-18 5 0 6 4 3 9-4 6-11 11-19 11-4 0-6-2-5-5 2-6 12-12 21-12 8 0 12 4 9 9-3 6-9 9-14 9m18-18c-3 7-4 12-1 15 4 4 12 0 18-7m3-8c-3 7-4 12-1 15 4 4 12 0 18-7m4-8c-3 7-4 12-1 15 4 4 13 0 20-8" stroke-width="6"/>
+  </g>
+</svg>
