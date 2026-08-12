@@ -32,9 +32,7 @@ import { detectHeaderRow, downloadTemplate } from "@/lib/import-utils";
 import {
   COMPANY_LABELS,
   getLocalHistory,
-  getLocalRows,
   removeLocalImport,
-  saveLocalImport,
   type Company,
 } from "@/lib/local-reports";
 type Row = Record<string, unknown> & { id?: number };
@@ -231,7 +229,7 @@ function Importer({
     [selected, headerRow, rawHeaders],
   );
   useEffect(() => {
-    fetch("/api/database/health")
+    fetch("/api/storage/health")
       .then(async (r) => {
         const d = await r.json().catch(() => ({}));
         setDatabaseAvailable(
@@ -271,36 +269,6 @@ function Importer({
   }
   async function save(strategy: "cancel" | "replace" | "new" = "cancel") {
     if (!file || !selected) return;
-    if (databaseAvailable === false) {
-      const hasExisting = getLocalRows(company, type).length > 0;
-      if (strategy === "cancel" && hasExisting) {
-        setDuplicate(true);
-        return;
-      }
-      setBusy("Menyimpan data...");
-      setError("");
-      try {
-        const message = "Import berhasil. Data tersimpan di browser ini.";
-        saveLocalImport(
-          {
-            company,
-            reportType: type,
-            fileName: file.name,
-            sheetName: selected.name,
-            rows,
-          },
-          strategy === "replace" ? "replace" : "new",
-        );
-        setDuplicate(false);
-        setSuccess(message);
-        onDone(message);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Data gagal disimpan.");
-      } finally {
-        setBusy("");
-      }
-      return;
-    }
     setBusy("Menyimpan data...");
     setError("");
     try {
@@ -322,15 +290,7 @@ function Importer({
         setDuplicate(true);
         return;
       }
-      if (!res.ok) {
-        if (res.status === 503) {
-          setDatabaseAvailable(false);
-          setBusy("");
-          setTimeout(() => save(strategy), 0);
-          return;
-        }
-        throw new Error(d.error);
-      }
+      if (!res.ok) throw new Error(d.error);
       setDuplicate(false);
       setSuccess(
         `Import berhasil. ${d.total} baris berhasil disimpan ke ${REPORTS[type]}.`,
@@ -351,6 +311,12 @@ function Importer({
         </button>
       )}
       <Panel title="Upload / Import Excel">
+        {databaseAvailable === false && (
+          <p className="mb-4 text-sm text-gold-300">
+            Penyimpanan bersama belum terhubung. Hubungkan Vercel Blob agar
+            data dapat dilihat oleh semua user.
+          </p>
+        )}
         <p className="mb-4 text-sm text-gold-300">
           <b>Perusahaan:</b> {COMPANY_LABELS[company]}
         </p>
@@ -489,7 +455,8 @@ function Importer({
           <b>{success}</b>
           {databaseAvailable === false && (
             <p className="mt-1 text-sm">
-              Mode Lokal — database belum terhubung.
+              Penyimpanan bersama belum terhubung. Hubungkan Vercel Blob agar
+              data dapat dilihat oleh semua user.
             </p>
           )}
           <div className="mt-3">
@@ -529,7 +496,7 @@ function History({
       storageMode: "local",
     }));
     try {
-      const health = await fetch("/api/database/health");
+      const health = await fetch("/api/storage/health");
       const status = await health.json();
       if (health.ok && status.connected) {
         setDatabaseAvailable(true);
@@ -562,7 +529,10 @@ function History({
   async function remove(item: History) {
     if (!confirm("Hapus batch import dan seluruh barisnya?")) return;
     if (item.storageMode === "local") removeLocalImport(item.id);
-    else await fetch(`/api/imports/${item.id}`, { method: "DELETE" });
+    else
+      await fetch(`/api/imports/${item.id}?company=${company}`, {
+        method: "DELETE",
+      });
     void load();
     reload();
   }
@@ -570,7 +540,8 @@ function History({
     <Panel title="Riwayat Import">
       {!databaseAvailable && (
         <p className="mb-3 text-sm text-gold-300">
-          Mode Lokal aktif. Data disimpan di browser ini.
+          Penyimpanan bersama belum terhubung. Hubungkan Vercel Blob agar data
+          dapat dilihat oleh semua user.
         </p>
       )}
       <div className="overflow-x-auto">
@@ -596,7 +567,7 @@ function History({
                 <td>{x.sheet_name}</td>
                 <td>{x.row_count}</td>
                 <td>{new Date(x.created_at).toLocaleString("id-ID")}</td>
-                <td>{x.storageMode === "local" ? "Lokal" : "Database"}</td>
+                <td>{x.storageMode === "local" ? "Lokal" : "Vercel Blob"}</td>
                 <td>
                   <Link
                     className="text-gold-300"
@@ -826,17 +797,14 @@ export default function DashboardApp() {
     const pairs = await Promise.all(
       types.map(async (type) => {
         try {
-          const health = await fetch("/api/database/health"),
-            status = await health.json();
-          if (health.ok && status.configured && status.connected) {
-            const r = await fetch(
-                `/api/reports?reportType=${type}&company=${company}`,
-              ),
-              d = await r.json();
-            if (r.ok && Array.isArray(d)) return [type, d] as const;
-          }
+          const r = await fetch(
+              `/api/reports?reportType=${type}&company=${company}`,
+              { cache: "no-store" },
+            ),
+            d = await r.json();
+          if (r.ok && Array.isArray(d)) return [type, d] as const;
         } catch {}
-        return [type, getLocalRows(company, type as ReportType)] as const;
+        return [type, []] as const;
       }),
     );
     setDatasets((x) => ({ ...x, ...Object.fromEntries(pairs) }));
@@ -862,8 +830,8 @@ export default function DashboardApp() {
     content = (
       <Panel title="Pengaturan Aplikasi">
         <p className="text-zinc-400">
-          Penyimpanan database digunakan jika Supabase tersedia. Jika belum
-          tersedia, import disimpan secara lokal di browser.
+          Laporan disimpan pada Vercel Private Blob agar tersedia bagi semua
+          user.
         </p>
       </Panel>
     );
@@ -874,9 +842,6 @@ export default function DashboardApp() {
         {notice && (
           <div className="success">
             <b>{notice}</b>
-            <p className="mt-1 text-sm">
-              Mode Lokal — database belum terhubung.
-            </p>
           </div>
         )}
         <div className="flex justify-end">

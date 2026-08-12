@@ -56,50 +56,6 @@ export function getLocalHistory(company?: Company) {
   return company ? items.filter((x) => x.company === company) : items;
 }
 
-export function saveLocalImport(
-  input: {
-    company: Company;
-    reportType: ReportType;
-    fileName: string;
-    sheetName: string;
-    rows: ReportRow[];
-  },
-  strategy: "replace" | "new",
-) {
-  if (!available()) throw new Error("Penyimpanan browser tidak tersedia.");
-  const id = crypto?.randomUUID?.() ?? `local-${Date.now()}`;
-  const batch = input.rows.map((row) => ({ ...row, __localImportId: id }));
-  const existing = getLocalRows(input.company, input.reportType);
-  const history = getLocalHistory();
-  const item: LocalImport = {
-    id,
-    company: input.company,
-    reportType: input.reportType,
-    fileName: input.fileName,
-    sheetName: input.sheetName,
-    rowCount: batch.length,
-    createdAt: new Date().toISOString(),
-    storageMode: "local",
-  };
-  localStorage.setItem(
-    localKey(input.company, input.reportType),
-    JSON.stringify(strategy === "replace" ? batch : [...existing, ...batch]),
-  );
-  localStorage.setItem(
-    IMPORT_HISTORY_KEY,
-    JSON.stringify([
-      item,
-      ...(strategy === "replace"
-        ? history.filter(
-            (x) =>
-              x.company !== input.company || x.reportType !== input.reportType,
-          )
-        : history),
-    ]),
-  );
-  window.dispatchEvent(new CustomEvent("budgeting-local-data-changed"));
-  return item;
-}
 export function removeLocalImport(id: string) {
   if (!available()) return;
   const history = getLocalHistory();

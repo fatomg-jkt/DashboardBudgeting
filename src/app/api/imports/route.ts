@@ -1,35 +1,30 @@
-import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { readReport, type Company } from "@/lib/blob-storage";
+import { REPORTS } from "@/lib/reports";
 import { saveReportImport, type ImportBody } from "@/lib/report-import";
 export const runtime = "nodejs";
-export async function GET(req: Request) {
+
+export async function GET(request: Request) {
+  const company = new URL(request.url).searchParams.get("company");
+  if (company !== "1001" && company !== "maison_y")
+    return NextResponse.json({ error: "Perusahaan tidak valid." }, { status: 400 });
   try {
-    const company = new URL(req.url).searchParams.get("company");
-    if (!["1001", "maison_y"].includes(String(company)))
-      return NextResponse.json(
-        { error: "Perusahaan tidak valid." },
-        { status: 400 },
-      );
-    return NextResponse.json(
-      await db(
-        `report_imports?company=eq.${encodeURIComponent(String(company))}&select=*&order=created_at.desc`,
-      ),
+    const reports = await Promise.all(
+      Object.keys(REPORTS).map((type) => readReport(company as Company, type as keyof typeof REPORTS)),
     );
-  } catch (e) {
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Gagal membaca riwayat." },
-      { status: 500 },
+      reports.flatMap((report) => report.imports.map((item) => ({
+        id: item.id, company, report_type: report.reportType, file_name: item.fileName,
+        sheet_name: item.sheetName, row_count: item.rowCount, created_at: item.importedAt,
+      }))).sort((a, b) => b.created_at.localeCompare(a.created_at)),
+      { headers: { "Cache-Control": "no-store" } },
     );
+  } catch (error) {
+    console.error("Import history read failed.", error);
+    return NextResponse.json({ error: "Penyimpanan bersama tidak dapat dihubungi." }, { status: 503 });
   }
 }
-export async function POST(req: Request) {
-  try {
-    const result = await saveReportImport((await req.json()) as ImportBody);
-    return NextResponse.json(result.body, { status: result.status });
-  } catch {
-    return NextResponse.json(
-      { error: "Data import tidak lengkap atau tidak valid." },
-      { status: 400 },
-    );
-  }
+export async function POST(request: Request) {
+  const result = await saveReportImport((await request.json()) as ImportBody);
+  return NextResponse.json(result.body, { status: result.status });
 }
