@@ -29,14 +29,7 @@ import {
 } from "recharts";
 import { REPORTS, ReportType } from "@/lib/reports";
 import { detectHeaderRow, downloadTemplate } from "@/lib/import-utils";
-import {
-  COMPANY_LABELS,
-  getLocalHistory,
-  getLocalRows,
-  removeLocalImport,
-  saveLocalImport,
-  type Company,
-} from "@/lib/local-reports";
+import { COMPANY_LABELS, type Company } from "@/lib/local-reports";
 type Row = Record<string, unknown> & { id?: number };
 type Sheet = { name: string; rows: string[][] };
 type History = {
@@ -47,7 +40,7 @@ type History = {
   sheet_name: string;
   row_count: number;
   created_at: string;
-  storageMode: "local" | "database";
+  storageMode: "blob";
 };
 const routes = [
   ["Dashboard", "/", Home],
@@ -206,7 +199,7 @@ function Importer({
     [error, setError] = useState(""),
     [success, setSuccess] = useState(""),
     [duplicate, setDuplicate] = useState(false),
-    [databaseAvailable, setDatabaseAvailable] = useState<boolean>();
+    [storageAvailable, setStorageAvailable] = useState<boolean>();
   const selected = sheets[sheet];
   const rawHeaders = useMemo(
     () =>
@@ -231,14 +224,14 @@ function Importer({
     [selected, headerRow, rawHeaders],
   );
   useEffect(() => {
-    fetch("/api/database/health")
+    fetch("/api/storage/health")
       .then(async (r) => {
         const d = await r.json().catch(() => ({}));
-        setDatabaseAvailable(
+        setStorageAvailable(
           r.ok && d.configured === true && d.connected === true,
         );
       })
-      .catch(() => setDatabaseAvailable(false));
+      .catch(() => setStorageAvailable(false));
   }, []);
   async function choose(f?: File) {
     if (!f) return;
@@ -271,73 +264,41 @@ function Importer({
   }
   async function save(strategy: "cancel" | "replace" | "new" = "cancel") {
     if (!file || !selected) return;
-    if (databaseAvailable === false) {
-      const hasExisting = getLocalRows(company, type).length > 0;
-      if (strategy === "cancel" && hasExisting) {
-        setDuplicate(true);
-        return;
-      }
-      setBusy("Menyimpan data...");
-      setError("");
-      try {
-        const message = "Import berhasil. Data tersimpan di browser ini.";
-        saveLocalImport(
-          {
-            company,
-            reportType: type,
-            fileName: file.name,
-            sheetName: selected.name,
-            rows,
-          },
-          strategy === "replace" ? "replace" : "new",
-        );
-        setDuplicate(false);
-        setSuccess(message);
-        onDone(message);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Data gagal disimpan.");
-      } finally {
-        setBusy("");
-      }
+    if (storageAvailable === false) {
+      setError("Penyimpanan bersama belum terhubung. Data belum disimpan.");
       return;
     }
     setBusy("Menyimpan data...");
     setError("");
     try {
-      const res = await fetch("/api/report-import", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            company,
-            reportType: type,
-            fileName: file.name,
-            sheetName: selected.name,
-            headers: rawHeaders,
-            rows,
-            strategy,
-          }),
+      const response = await fetch("/api/report-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company,
+          reportType: type,
+          fileName: file.name,
+          sheetName: selected.name,
+          headers: rawHeaders,
+          rows,
+          strategy,
         }),
-        d = await res.json();
-      if (res.status === 409) {
+      });
+      const data = await response.json();
+      if (response.status === 409) {
         setDuplicate(true);
         return;
       }
-      if (!res.ok) {
-        if (res.status === 503) {
-          setDatabaseAvailable(false);
-          setBusy("");
-          setTimeout(() => save(strategy), 0);
-          return;
-        }
-        throw new Error(d.error);
+      if (!response.ok) {
+        if (response.status === 503) setStorageAvailable(false);
+        throw new Error(data.error);
       }
       setDuplicate(false);
-      setSuccess(
-        `Import berhasil. ${d.total} baris berhasil disimpan ke ${REPORTS[type]}.`,
-      );
+      const message = `Import berhasil. ${data.total} baris berhasil disimpan ke ${REPORTS[type]}.`;
+      setSuccess(message);
       onDone();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Data gagal disimpan.");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Data gagal disimpan.");
     } finally {
       setBusy("");
     }
@@ -395,11 +356,10 @@ function Importer({
             />
           </div>
         </div>
-        {databaseAvailable === false && (
+        {storageAvailable === false && (
           <div className="mt-4 text-sm text-gold-300">
-            <b>Mode Lokal</b>
-            <br />
-            Data akan disimpan di browser ini.
+            Penyimpanan bersama belum terhubung. Hubungkan Vercel Blob agar
+            data dapat dilihat oleh semua user.
           </div>
         )}
       </Panel>
@@ -487,11 +447,6 @@ function Importer({
       {success && (
         <div className="success">
           <b>{success}</b>
-          {databaseAvailable === false && (
-            <p className="mt-1 text-sm">
-              Mode Lokal — database belum terhubung.
-            </p>
-          )}
           <div className="mt-3">
             <Link
               className="gold-button"
@@ -516,61 +471,46 @@ function History({
   reload: () => void;
 }) {
   const [items, setItems] = useState<History[]>([]),
-    [databaseAvailable, setDatabaseAvailable] = useState(false);
+    [storageAvailable, setStorageAvailable] = useState(true);
   const load = useCallback(async () => {
-    const local: History[] = getLocalHistory(company).map((x) => ({
-      id: x.id,
-      company: x.company,
-      report_type: x.reportType,
-      file_name: x.fileName,
-      sheet_name: x.sheetName,
-      row_count: x.rowCount,
-      created_at: x.createdAt,
-      storageMode: "local",
-    }));
     try {
-      const health = await fetch("/api/database/health");
+      const health = await fetch("/api/storage/health");
       const status = await health.json();
-      if (health.ok && status.connected) {
-        setDatabaseAvailable(true);
-        const r = await fetch(`/api/imports?company=${company}`),
-          d = await r.json();
-        const database: Array<History> = Array.isArray(d)
-          ? d.map((x: Omit<History, "storageMode">) => ({
-              ...x,
-              company: x.company,
-              storageMode: "database",
-            }))
-          : [];
-        setItems(
-          [...local, ...database].sort((a, b) =>
-            b.created_at.localeCompare(a.created_at),
-          ),
-        );
+      if (!health.ok || !status.connected) {
+        setStorageAvailable(false);
+        setItems([]);
         return;
       }
-    } catch {}
-    setDatabaseAvailable(false);
-    setItems(local);
+      setStorageAvailable(true);
+      const response = await fetch(`/api/imports?company=${company}`);
+      const data = await response.json();
+      setItems(
+        Array.isArray(data)
+          ? data.map((item: Omit<History, "storageMode">) => ({
+              ...item,
+              storageMode: "blob" as const,
+            }))
+          : [],
+      );
+    } catch {
+      setStorageAvailable(false);
+      setItems([]);
+    }
   }, [company]);
   useEffect(() => {
     void load();
-    window.addEventListener("budgeting-local-data-changed", load);
-    return () =>
-      window.removeEventListener("budgeting-local-data-changed", load);
   }, [load]);
   async function remove(item: History) {
     if (!confirm("Hapus batch import dan seluruh barisnya?")) return;
-    if (item.storageMode === "local") removeLocalImport(item.id);
-    else await fetch(`/api/imports/${item.id}`, { method: "DELETE" });
+    await fetch(`/api/imports/${item.id}`, { method: "DELETE" });
     void load();
     reload();
   }
   return (
     <Panel title="Riwayat Import">
-      {!databaseAvailable && (
+      {!storageAvailable && (
         <p className="mb-3 text-sm text-gold-300">
-          Mode Lokal aktif. Data disimpan di browser ini.
+          Penyimpanan bersama belum terhubung. Hubungkan Vercel Blob agar data dapat dilihat oleh semua user.
         </p>
       )}
       <div className="overflow-x-auto">
@@ -588,28 +528,31 @@ function History({
             </tr>
           </thead>
           <tbody>
-            {items.map((x) => (
-              <tr key={`${x.storageMode}-${x.id}`}>
-                <td>{x.file_name}</td>
-                <td>{COMPANY_LABELS[x.company]}</td>
-                <td>{REPORTS[x.report_type]}</td>
-                <td>{x.sheet_name}</td>
-                <td>{x.row_count}</td>
-                <td>{new Date(x.created_at).toLocaleString("id-ID")}</td>
-                <td>{x.storageMode === "local" ? "Lokal" : "Database"}</td>
+            {items.map((item) => (
+              <tr key={item.id}>
+                <td>{item.file_name}</td>
+                <td>{COMPANY_LABELS[item.company]}</td>
+                <td>{REPORTS[item.report_type]}</td>
+                <td>{item.sheet_name}</td>
+                <td>{item.row_count}</td>
+                <td>{new Date(item.created_at).toLocaleString("id-ID")}</td>
+                <td>Vercel Blob</td>
                 <td>
                   <Link
                     className="text-gold-300"
                     href={
                       Object.entries(routeType).find(
-                        ([, v]) => v === x.report_type,
+                        ([, value]) => value === item.report_type,
                       )?.[0] ?? "/upload-excel"
                     }
                   >
                     Lihat
-                  </Link>{" "}
-                  ·{" "}
-                  <button className="text-red-300" onClick={() => remove(x)}>
+                  </Link>
+                  {" · "}
+                  <button
+                    className="text-red-300"
+                    onClick={() => remove(item)}
+                  >
                     Hapus
                   </button>
                 </td>
@@ -826,17 +769,15 @@ export default function DashboardApp() {
     const pairs = await Promise.all(
       types.map(async (type) => {
         try {
-          const health = await fetch("/api/database/health"),
-            status = await health.json();
-          if (health.ok && status.configured && status.connected) {
-            const r = await fetch(
-                `/api/reports?reportType=${type}&company=${company}`,
-              ),
-              d = await r.json();
-            if (r.ok && Array.isArray(d)) return [type, d] as const;
-          }
-        } catch {}
-        return [type, getLocalRows(company, type as ReportType)] as const;
+          const response = await fetch(
+            `/api/reports?reportType=${type}&company=${company}`,
+            { cache: "no-store" },
+          );
+          const data = await response.json();
+          return [type, response.ok && Array.isArray(data) ? data : []] as const;
+        } catch {
+          return [type, []] as const;
+        }
       }),
     );
     setDatasets((x) => ({ ...x, ...Object.fromEntries(pairs) }));
@@ -862,8 +803,8 @@ export default function DashboardApp() {
     content = (
       <Panel title="Pengaturan Aplikasi">
         <p className="text-zinc-400">
-          Penyimpanan database digunakan jika Supabase tersedia. Jika belum
-          tersedia, import disimpan secara lokal di browser.
+          Penyimpanan bersama menggunakan Vercel Blob agar data dapat dilihat
+          oleh semua user.
         </p>
       </Panel>
     );
@@ -874,9 +815,6 @@ export default function DashboardApp() {
         {notice && (
           <div className="success">
             <b>{notice}</b>
-            <p className="mt-1 text-sm">
-              Mode Lokal — database belum terhubung.
-            </p>
           </div>
         )}
         <div className="flex justify-end">
