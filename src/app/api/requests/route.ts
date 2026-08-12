@@ -1,4 +1,3 @@
-import { execute, query, quote } from '@/lib/db'; import { NextResponse } from 'next/server';
-export const runtime='nodejs';
-export async function GET(){try{return NextResponse.json(query('SELECT * FROM budget_requests ORDER BY id DESC'))}catch(e){return NextResponse.json({error:String(e)},{status:500})}}
-export async function POST(req:Request){try{const r=await req.json();execute(`INSERT INTO budget_requests(request_date,department,category,amount,description,pic,status) VALUES(${quote(r.request_date)},${quote(r.department)},${quote(r.category)},${Number(r.amount)},${quote(r.description)},${quote(r.pic)},${quote(r.status)})`);return NextResponse.json({ok:true})}catch(e){return NextResponse.json({error:String(e)},{status:500})}}
+import { db, publicDatabaseError } from '@/lib/db'; import { NextResponse } from 'next/server'; export const runtime='nodejs';
+export async function GET(){try{return NextResponse.json(await db('budget_requests?select=*&order=created_at.desc'))}catch(e){return NextResponse.json({error:publicDatabaseError(e,'Pengajuan gagal dimuat.')},{status:500})}}
+export async function POST(req:Request){try{const r=await req.json();if(!r.request_date||!r.department||!r.category||!Number.isFinite(Number(r.amount)))return NextResponse.json({error:'Data pengajuan tidak lengkap.'},{status:400});return NextResponse.json(await db('budget_requests',{method:'POST',body:JSON.stringify({...r,amount:Number(r.amount)})}))}catch(e){return NextResponse.json({error:publicDatabaseError(e,'Pengajuan gagal disimpan.')},{status:500})}}
