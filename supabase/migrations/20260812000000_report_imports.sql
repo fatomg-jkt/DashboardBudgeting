@@ -11,6 +11,7 @@ create table if not exists public.report_import_rows (
   report_type text not null, row_number integer not null, data_json jsonb not null, created_at timestamptz not null default now()
 );
 create index if not exists report_rows_type on public.report_import_rows(report_type);
+create index if not exists report_rows_import_id on public.report_import_rows(import_id);
 alter table public.report_imports enable row level security;
 alter table public.report_import_rows enable row level security;
 create table if not exists public.budget_requests (
