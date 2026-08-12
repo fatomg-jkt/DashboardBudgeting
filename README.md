@@ -1,20 +1,20 @@
 # DashboardBudgeting
 
-Aplikasi Dashboard Budgeting profesional bertema **Black & Gold** yang dibuat dengan Next.js, TypeScript, Tailwind CSS, Recharts, dan Lucide React.
+Aplikasi budgeting Black Gold berbasis Next.js App Router, React, TypeScript, Tailwind CSS, dan Recharts.
 
-## Fitur
+## Supabase report import
 
-- Sidebar permanen di desktop dan layout responsif.
-- Ringkasan KPI budgeting dengan format Rupiah Indonesia.
-- Grafik Budget vs Actual, realisasi bulanan, budget per departemen, dan komposisi kategori.
-- Tabel monitoring budget dengan status over budget.
-- Semua menu sidebar memiliki section tujuan dan konten dummy sehingga tidak ada halaman kosong.
-- Tidak menggunakan login, database, API eksternal, atau environment variable.
+Import report disimpan server-side ke Supabase melalui `POST /api/report-import`. Terapkan migration `supabase/migrations/20260812000000_create_report_import_tables.sql`, lalu konfigurasi environment server:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Service role key hanya dibaca oleh server route dan tidak boleh diberi prefix `NEXT_PUBLIC_`. Status koneksi dapat diperiksa melalui `GET /api/database/health`.
 
 ## Perintah
 
 ```bash
-npm install
+npm run lint
 npm run typecheck
 npm run build
 npm run dev
