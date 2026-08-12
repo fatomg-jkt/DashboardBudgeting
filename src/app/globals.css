@@ -6,3 +6,19 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: #070707; color: #f8fafc; }
 button, a { -webkit-tap-highlight-color: transparent; }
+@layer components {
+  .gold-button { @apply rounded-lg bg-gold-500 px-4 py-2 text-sm font-semibold text-black transition hover:bg-gold-300; }
+  .secondary-button { @apply rounded-lg border border-gold-500/40 px-4 py-2 text-sm text-gold-300 hover:bg-gold-500/10; }
+  .input { @apply rounded-lg border border-gold-500/20 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-gold-500; }
+  .kpi { @apply rounded-2xl border border-gold-500/20 bg-zinc-950/80 p-5; }
+  .kpi p { @apply text-sm text-zinc-400; } .kpi b { @apply mt-2 block text-xl text-white; }
+  .chart { @apply h-72; }
+  .data-table { @apply w-full min-w-[900px] text-left text-sm; }
+  .data-table th { @apply border-b border-gold-500/20 py-3 pr-4 text-gold-300; }
+  .data-table td { @apply border-b border-zinc-800 py-3 pr-4; }
+  .status { @apply inline-block whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold; }
+  .status.good { @apply bg-emerald-500/15 text-emerald-200; } .status.warn { @apply bg-amber-500/15 text-amber-200; } .status.bad { @apply bg-red-500/15 text-red-200; }
+  .upload-zone { @apply rounded-xl border-2 border-dashed border-gold-500/30 p-10 text-center text-zinc-300; }
+  .error { @apply rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-200; }
+  .success { @apply rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-100; }
+}
