@@ -123,7 +123,22 @@ export async function saveReportImport(
     };
   } catch (error) {
     if (error instanceof DatabaseConfigurationError) {
-      return { status: 503, body: { error: "Database belum dikonfigurasi." } };
+      return {
+        status: 503,
+        body: {
+          error:
+            "Database belum terhubung. Hubungkan Supabase agar data dapat dilihat oleh semua user.",
+        },
+      };
+    }
+    if (error instanceof DatabaseConnectionError) {
+      return {
+        status: 503,
+        body: {
+          error:
+            "Database belum terhubung. Hubungkan Supabase agar data dapat dilihat oleh semua user.",
+        },
+      };
     }
     console.error("Report import failed.", error);
     return {
