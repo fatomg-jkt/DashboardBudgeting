@@ -1,0 +1,2 @@
+import { db } from '@/lib/db'; import { NextResponse } from 'next/server'; export const runtime='nodejs';
+export async function DELETE(_:Request,{params}:{params:Promise<{id:string}>}){try{const {id}=await params;await db(`report_imports?id=eq.${encodeURIComponent(id)}`,{method:'DELETE'});return NextResponse.json({ok:true})}catch(e){return NextResponse.json({error:e instanceof Error?e.message:'Hapus gagal.'},{status:500})}}
