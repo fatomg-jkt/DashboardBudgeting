@@ -1,11 +1,13 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
-  db,
-  DatabaseConfigurationError,
-  DatabaseConnectionError,
-} from "@/lib/db";
+  BlobConfigurationError,
+  readReport,
+  writeReport,
+  type StoredImport,
+} from "@/lib/blob-storage";
+import type { Company } from "@/lib/local-reports";
 import { isReportType } from "@/lib/reports";
 
 export type ImportBody = {
@@ -25,9 +27,7 @@ export type ImportResult =
       body: { error: string; duplicate?: true };
     };
 
-export async function saveReportImport(
-  body: ImportBody,
-): Promise<ImportResult> {
+export async function saveReportImport(body: ImportBody): Promise<ImportResult> {
   const {
     company,
     reportType,
@@ -38,7 +38,7 @@ export async function saveReportImport(
     strategy = "cancel",
   } = body;
   if (
-    !["1001", "maison_y"].includes(String(company)) ||
+    (company !== "1001" && company !== "maison_y") ||
     !isReportType(reportType) ||
     typeof fileName !== "string" ||
     !fileName.trim() ||
@@ -56,74 +56,60 @@ export async function saveReportImport(
     };
   }
 
-  const normalizedHeaders =
-    Array.isArray(headers) &&
-    headers.every((value) => typeof value === "string")
-      ? headers
-      : Object.keys(rows[0] as Record<string, unknown>);
+  // Validate optional headers without changing the existing parser or row values.
+  if (
+    headers !== undefined &&
+    (!Array.isArray(headers) ||
+      !headers.every((value) => typeof value === "string"))
+  ) {
+    return {
+      status: 400,
+      body: { error: "Data import tidak lengkap atau tidak valid." },
+    };
+  }
+
   const hash = createHash("sha256")
     .update(JSON.stringify([fileName, sheetName, rows]))
     .digest("hex");
 
   try {
-    const old = await db<{ id: string }[]>(
-      `report_imports?report_type=eq.${encodeURIComponent(reportType)}&company=eq.${encodeURIComponent(String(company))}&file_hash=eq.${hash}&select=id`,
-    );
-    if (old.length && strategy === "cancel") {
+    const report = await readReport(company as Company, reportType);
+    if (
+      strategy === "cancel" &&
+      report.imports.some((item) => item.hash === hash)
+    ) {
       return {
         status: 409,
         body: { duplicate: true, error: "Data serupa sudah pernah diimport." },
       };
     }
-    if (old.length && strategy === "replace") {
-      await db(`report_imports?id=eq.${encodeURIComponent(old[0].id)}`, {
-        method: "DELETE",
-      });
-    }
 
-    const effectiveHash = strategy === "new" ? `${hash}-${Date.now()}` : hash;
-    const imports = await db<{ id: string }[]>("report_imports", {
-      method: "POST",
-      body: JSON.stringify({
-        report_type: reportType,
-        company,
-        file_name: fileName,
-        file_hash: effectiveHash,
-        sheet_name: sheetName,
-        row_count: rows.length,
-        headers: normalizedHeaders,
-      }),
-    });
-    const importId = imports[0]?.id;
-    if (!importId) throw new DatabaseConnectionError();
-
-    try {
-      await db("report_import_rows", {
-        method: "POST",
-        body: JSON.stringify(
-          rows.map((data_json, index) => ({
-            import_id: importId,
-            report_type: reportType,
-            company,
-            row_number: index + 2,
-            data_json,
-          })),
-        ),
-      });
-    } catch (error) {
-      await db(`report_imports?id=eq.${encodeURIComponent(importId)}`, {
-        method: "DELETE",
-      }).catch(() => undefined);
-      throw error;
-    }
-
-    return {
-      status: 200,
-      body: { success: true, id: importId, total: rows.length },
+    const id = randomUUID();
+    const importedAt = new Date().toISOString();
+    const metadata: StoredImport = {
+      id,
+      fileName,
+      sheetName,
+      rowCount: rows.length,
+      importedAt,
+      hash,
     };
+    const taggedRows = (rows as Record<string, unknown>[]).map((row) => ({
+      ...row,
+      importId: id,
+    }));
+    const replace = strategy === "replace";
+    await writeReport(company as Company, reportType, {
+      ...report,
+      updatedAt: importedAt,
+      imports: replace ? [metadata] : [...report.imports, metadata],
+      rows: replace ? taggedRows : [...report.rows, ...taggedRows],
+    });
+
+    return { status: 200, body: { success: true, id, total: rows.length } };
   } catch (error) {
-    if (error instanceof DatabaseConfigurationError) {
-      return { status: 503, body: { error: "Database belum dikonfigurasi." } };
+    if (error instanceof BlobConfigurationError) {
+      return { status: 503, body: { error: error.message } };
     }
     console.error("Report import failed.", error);
     return {

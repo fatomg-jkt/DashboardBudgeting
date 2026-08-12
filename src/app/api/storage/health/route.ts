@@ -9,6 +9,9 @@ export async function GET() {
   const connected = configured ? await checkBlobConnection() : false;
   return NextResponse.json(
     { configured, connected, storage: "vercel-blob" },
-    { status: connected ? 200 : 503, headers: { "Cache-Control": "no-store" } },
+    {
+      status: connected ? 200 : 503,
+      headers: { "Cache-Control": "no-store" },
+    },
   );
 }
