@@ -34,7 +34,6 @@ import {
   getLocalHistory,
   getLocalRows,
   removeLocalImport,
-  saveLocalImport,
   type Company,
 } from "@/lib/local-reports";
 type Row = Record<string, unknown> & { id?: number };
@@ -271,34 +270,10 @@ function Importer({
   }
   async function save(strategy: "cancel" | "replace" | "new" = "cancel") {
     if (!file || !selected) return;
-    if (databaseAvailable === false) {
-      const hasExisting = getLocalRows(company, type).length > 0;
-      if (strategy === "cancel" && hasExisting) {
-        setDuplicate(true);
-        return;
-      }
-      setBusy("Menyimpan data...");
-      setError("");
-      try {
-        const message = "Import berhasil. Data tersimpan di browser ini.";
-        saveLocalImport(
-          {
-            company,
-            reportType: type,
-            fileName: file.name,
-            sheetName: selected.name,
-            rows,
-          },
-          strategy === "replace" ? "replace" : "new",
-        );
-        setDuplicate(false);
-        setSuccess(message);
-        onDone(message);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Data gagal disimpan.");
-      } finally {
-        setBusy("");
-      }
+    if (databaseAvailable !== true) {
+      setError(
+        "Database belum terhubung. Hubungkan Supabase agar data dapat dilihat oleh semua user.",
+      );
       return;
     }
     setBusy("Menyimpan data...");
@@ -325,9 +300,9 @@ function Importer({
       if (!res.ok) {
         if (res.status === 503) {
           setDatabaseAvailable(false);
-          setBusy("");
-          setTimeout(() => save(strategy), 0);
-          return;
+          throw new Error(
+            "Database belum terhubung. Hubungkan Supabase agar data dapat dilihat oleh semua user.",
+          );
         }
         throw new Error(d.error);
       }
@@ -397,9 +372,7 @@ function Importer({
         </div>
         {databaseAvailable === false && (
           <div className="mt-4 text-sm text-gold-300">
-            <b>Mode Lokal</b>
-            <br />
-            Data akan disimpan di browser ini.
+            Database belum terhubung. Data belum dapat disimpan bersama.
           </div>
         )}
       </Panel>
@@ -455,7 +428,7 @@ function Importer({
           </div>
           <GenericTable rows={rows} limit={15} />
           <button
-            disabled={!!busy || !rows.length}
+            disabled={!!busy || !rows.length || databaseAvailable !== true}
             className="gold-button mt-5 disabled:opacity-40"
             onClick={() => save()}
           >
@@ -487,11 +460,6 @@ function Importer({
       {success && (
         <div className="success">
           <b>{success}</b>
-          {databaseAvailable === false && (
-            <p className="mt-1 text-sm">
-              Mode Lokal — database belum terhubung.
-            </p>
-          )}
           <div className="mt-3">
             <Link
               className="gold-button"
@@ -516,7 +484,8 @@ function History({
   reload: () => void;
 }) {
   const [items, setItems] = useState<History[]>([]),
-    [databaseAvailable, setDatabaseAvailable] = useState(false);
+    [databaseAvailable, setDatabaseAvailable] = useState(false),
+    [migrationMessage, setMigrationMessage] = useState("");
   const load = useCallback(async () => {
     const local: History[] = getLocalHistory(company).map((x) => ({
       id: x.id,
@@ -566,13 +535,54 @@ function History({
     void load();
     reload();
   }
+  async function migrate(item: History) {
+    const rows = getLocalRows(company, item.report_type)
+      .filter((row) => row.__localImportId === item.id)
+      .map((row) =>
+        Object.fromEntries(
+          Object.entries(row).filter(([key]) => key !== "__localImportId"),
+        ),
+      );
+    if (!rows.length) {
+      setMigrationMessage("Data lokal untuk import ini tidak ditemukan.");
+      return;
+    }
+    setMigrationMessage("Mengupload data lokal...");
+    try {
+      const response = await fetch("/api/report-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company,
+          reportType: item.report_type,
+          fileName: item.file_name,
+          sheetName: item.sheet_name,
+          rows,
+          strategy: "cancel",
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      setMigrationMessage(
+        `${result.total} baris data lokal berhasil diupload ke database.`,
+      );
+      await load();
+      reload();
+    } catch (error) {
+      setMigrationMessage(
+        error instanceof Error ? error.message : "Upload data lokal gagal.",
+      );
+    }
+  }
   return (
     <Panel title="Riwayat Import">
       {!databaseAvailable && (
         <p className="mb-3 text-sm text-gold-300">
-          Mode Lokal aktif. Data disimpan di browser ini.
+          Database belum terhubung. Hubungkan Supabase agar data dapat dilihat
+          oleh semua user.
         </p>
       )}
+      {migrationMessage && <p className="mb-3 text-sm">{migrationMessage}</p>}
       <div className="overflow-x-auto">
         <table className="data-table">
           <thead>
@@ -609,6 +619,17 @@ function History({
                     Lihat
                   </Link>{" "}
                   ·{" "}
+                  {x.storageMode === "local" && databaseAvailable && (
+                    <>
+                      <button
+                        className="text-gold-300"
+                        onClick={() => migrate(x)}
+                      >
+                        Upload Data Lokal ke Database
+                      </button>{" "}
+                      ·{" "}
+                    </>
+                  )}
                   <button className="text-red-300" onClick={() => remove(x)}>
                     Hapus
                   </button>
@@ -805,7 +826,8 @@ export default function DashboardApp() {
     [loading, setLoading] = useState(false),
     [modal, setModal] = useState(false),
     [version, setVersion] = useState(0),
-    [notice, setNotice] = useState("");
+    [notice, setNotice] = useState(""),
+    [databaseAvailable, setDatabaseAvailable] = useState<boolean>();
   useEffect(() => {
     const saved = localStorage.getItem("budgeting_active_company");
     if (saved === "1001" || saved === "maison_y") setCompany(saved);
@@ -823,20 +845,25 @@ export default function DashboardApp() {
         : current
           ? [current]
           : [];
+    let connected = false;
+    try {
+      const health = await fetch("/api/database/health"),
+        status = await health.json();
+      connected = health.ok && status.configured && status.connected;
+    } catch {}
+    setDatabaseAvailable(connected);
     const pairs = await Promise.all(
       types.map(async (type) => {
-        try {
-          const health = await fetch("/api/database/health"),
-            status = await health.json();
-          if (health.ok && status.configured && status.connected) {
+        if (connected) {
+          try {
             const r = await fetch(
                 `/api/reports?reportType=${type}&company=${company}`,
               ),
               d = await r.json();
             if (r.ok && Array.isArray(d)) return [type, d] as const;
-          }
-        } catch {}
-        return [type, getLocalRows(company, type as ReportType)] as const;
+          } catch {}
+        }
+        return [type, []] as const;
       }),
     );
     setDatasets((x) => ({ ...x, ...Object.fromEntries(pairs) }));
@@ -862,21 +889,35 @@ export default function DashboardApp() {
     content = (
       <Panel title="Pengaturan Aplikasi">
         <p className="text-zinc-400">
-          Penyimpanan database digunakan jika Supabase tersedia. Jika belum
-          tersedia, import disimpan secara lokal di browser.
+          Supabase adalah penyimpanan utama untuk data bersama. Data lokal lama
+          hanya dapat diupload secara manual dari Riwayat Import.
         </p>
       </Panel>
     );
-  else if (pathname === "/") content = <Dashboard data={datasets} />;
+  else if (pathname === "/")
+    content = (
+      <div className="space-y-5">
+        {databaseAvailable === false && (
+          <div className="error">
+            Database belum terhubung. Hubungkan Supabase agar data dapat dilihat
+            oleh semua user.
+          </div>
+        )}
+        <Dashboard data={datasets} />
+      </div>
+    );
   else if (current)
     content = (
       <div className="space-y-5">
+        {databaseAvailable === false && (
+          <div className="error">
+            Database belum terhubung. Hubungkan Supabase agar data dapat dilihat
+            oleh semua user.
+          </div>
+        )}
         {notice && (
           <div className="success">
             <b>{notice}</b>
-            <p className="mt-1 text-sm">
-              Mode Lokal — database belum terhubung.
-            </p>
           </div>
         )}
         <div className="flex justify-end">
