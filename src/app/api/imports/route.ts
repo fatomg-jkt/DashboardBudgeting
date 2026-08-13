@@ -1,6 +1,7 @@
-import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { saveReportImport, type ImportBody } from "@/lib/report-import";
+import { readReport, type Company } from "@/lib/blob-reports";
+import { REPORTS } from "@/lib/reports";
 export const runtime = "nodejs";
 export async function GET(req: Request) {
   try {
@@ -10,11 +11,17 @@ export async function GET(req: Request) {
         { error: "Perusahaan tidak valid." },
         { status: 400 },
       );
-    return NextResponse.json(
-      await db(
-        `report_imports?company=eq.${encodeURIComponent(String(company))}&select=*&order=created_at.desc`,
-      ),
+    const reports = await Promise.all(
+      Object.keys(REPORTS).map(async (reportType) => ({
+        reportType,
+        report: await readReport(company as Company, reportType as keyof typeof REPORTS),
+      })),
     );
+    return NextResponse.json(reports.flatMap(({ reportType, report }) =>
+      report.imports.map((item) => ({
+        id: item.id, company, report_type: reportType, file_name: item.fileName,
+        sheet_name: item.sheetName, row_count: item.rows.length, created_at: item.createdAt,
+      }))), { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Gagal membaca riwayat." },

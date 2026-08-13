@@ -1,11 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
-import {
-  db,
-  DatabaseConfigurationError,
-  DatabaseConnectionError,
-} from "@/lib/db";
+import { BlobNotConfiguredError, readReport, writeReport, type Company } from "@/lib/blob-reports";
 import { isReportType } from "@/lib/reports";
 
 export type ImportBody = {
@@ -66,64 +62,35 @@ export async function saveReportImport(
     .digest("hex");
 
   try {
-    const old = await db<{ id: string }[]>(
-      `report_imports?report_type=eq.${encodeURIComponent(reportType)}&company=eq.${encodeURIComponent(String(company))}&file_hash=eq.${hash}&select=id`,
-    );
-    if (old.length && strategy === "cancel") {
+    const report = await readReport(company as Company, reportType);
+    const old = report.imports.find((item) => item.fileHash === hash);
+    if (old && strategy === "cancel") {
       return {
         status: 409,
         body: { duplicate: true, error: "Data serupa sudah pernah diimport." },
       };
     }
-    if (old.length && strategy === "replace") {
-      await db(`report_imports?id=eq.${encodeURIComponent(old[0].id)}`, {
-        method: "DELETE",
-      });
-    }
-
-    const effectiveHash = strategy === "new" ? `${hash}-${Date.now()}` : hash;
-    const imports = await db<{ id: string }[]>("report_imports", {
-      method: "POST",
-      body: JSON.stringify({
-        report_type: reportType,
-        company,
-        file_name: fileName,
-        file_hash: effectiveHash,
-        sheet_name: sheetName,
-        row_count: rows.length,
-        headers: normalizedHeaders,
-      }),
+    if (old && strategy === "replace")
+      report.imports = report.imports.filter((item) => item.id !== old.id);
+    const importId = crypto.randomUUID();
+    report.imports.push({
+      id: importId,
+      fileHash: strategy === "new" ? `${hash}-${Date.now()}` : hash,
+      fileName,
+      sheetName,
+      headers: normalizedHeaders,
+      rows: rows as Record<string, unknown>[],
+      createdAt: new Date().toISOString(),
     });
-    const importId = imports[0]?.id;
-    if (!importId) throw new DatabaseConnectionError();
-
-    try {
-      await db("report_import_rows", {
-        method: "POST",
-        body: JSON.stringify(
-          rows.map((data_json, index) => ({
-            import_id: importId,
-            report_type: reportType,
-            company,
-            row_number: index + 2,
-            data_json,
-          })),
-        ),
-      });
-    } catch (error) {
-      await db(`report_imports?id=eq.${encodeURIComponent(importId)}`, {
-        method: "DELETE",
-      }).catch(() => undefined);
-      throw error;
-    }
+    await writeReport(company as Company, reportType, report);
 
     return {
       status: 200,
       body: { success: true, id: importId, total: rows.length },
     };
   } catch (error) {
-    if (error instanceof DatabaseConfigurationError) {
-      return { status: 503, body: { error: "Database belum dikonfigurasi." } };
+    if (error instanceof BlobNotConfiguredError) {
+      return { status: 503, body: { error: "Penyimpanan bersama belum terhubung. Data belum disimpan." } };
     }
     console.error("Report import failed.", error);
     return {

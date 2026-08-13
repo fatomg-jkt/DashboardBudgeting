@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { readReport, type Company } from "@/lib/blob-reports";
 import { isReportType } from "@/lib/reports";
 import { NextResponse } from "next/server";
 export const runtime = "nodejs";
@@ -12,28 +12,15 @@ export async function GET(req: Request) {
         { error: "Jenis laporan atau perusahaan tidak valid." },
         { status: 400 },
       );
-    const rows = await db<
-      {
-        id: number;
-        import_id: string;
-        row_number: number;
-        data_json: Record<string, unknown>;
-      }[]
-    >(
-      `report_import_rows?report_type=eq.${encodeURIComponent(type)}&company=eq.${encodeURIComponent(String(company))}&select=id,import_id,row_number,data_json&order=id.asc`,
+    const report = await readReport(company as Company, type);
+    const rows = report.imports.flatMap((item) =>
+      item.rows.map((row, index) => ({ ...row, importId: item.id, rowNumber: index + 2 })),
     );
-    return NextResponse.json(
-      rows.map((x) => ({
-        ...x.data_json,
-        id: x.id,
-        importId: x.import_id,
-        rowNumber: x.row_number,
-      })),
-    );
+    return NextResponse.json(rows, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Gagal membaca data." },
-      { status: 500 },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
     );
   }
 }
