@@ -23,19 +23,31 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .success { @apply rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-100; }
 }
 
-/* Sidebar branding: show only the logo for the active company. */
+/* Sidebar branding: show only the active company logo, centered and fully visible. */
 aside > div:first-child {
   min-height: 150px;
-  padding-top: 100px;
+  padding-top: 12px;
   padding-bottom: 12px;
   text-align: center;
+  background-image: none;
+}
+aside > div:first-child::before {
+  content: "";
+  display: block;
+  width: 82px;
+  height: 82px;
+  margin: 0 auto 6px;
   background-image: url('/logo-1001.jpg');
   background-repeat: no-repeat;
-  background-size: 78px auto;
-  background-position: center top 12px;
+  background-position: center;
+  background-size: contain;
 }
-aside:has(> div:nth-child(2) button:nth-child(2).bg-gold-500) > div:first-child {
+aside:has(> div:nth-child(2) button:nth-child(2).bg-gold-500) > div:first-child::before {
+  width: 88px;
+  height: 82px;
   background-image: url('/logo-maison-y.jpg');
+  background-position: center;
+  background-size: contain;
 }
 aside > div:first-child > p,
 aside > div:first-child > h1 {
