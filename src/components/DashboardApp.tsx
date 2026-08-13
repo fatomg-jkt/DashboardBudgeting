@@ -31,10 +31,6 @@ import { REPORTS, ReportType } from "@/lib/reports";
 import { detectHeaderRow, downloadTemplate } from "@/lib/import-utils";
 import {
   COMPANY_LABELS,
-  getLocalHistory,
-  getLocalRows,
-  removeLocalImport,
-  saveLocalImport,
   type Company,
 } from "@/lib/local-reports";
 type Row = Record<string, unknown> & { id?: number };
@@ -47,7 +43,7 @@ type History = {
   sheet_name: string;
   row_count: number;
   created_at: string;
-  storageMode: "local" | "database";
+  storageMode: "vercel-blob";
 };
 const routes = [
   ["Dashboard", "/", Home],
@@ -231,7 +227,7 @@ function Importer({
     [selected, headerRow, rawHeaders],
   );
   useEffect(() => {
-    fetch("/api/database/health")
+    fetch("/api/storage/health")
       .then(async (r) => {
         const d = await r.json().catch(() => ({}));
         setDatabaseAvailable(
@@ -272,33 +268,7 @@ function Importer({
   async function save(strategy: "cancel" | "replace" | "new" = "cancel") {
     if (!file || !selected) return;
     if (databaseAvailable === false) {
-      const hasExisting = getLocalRows(company, type).length > 0;
-      if (strategy === "cancel" && hasExisting) {
-        setDuplicate(true);
-        return;
-      }
-      setBusy("Menyimpan data...");
-      setError("");
-      try {
-        const message = "Import berhasil. Data tersimpan di browser ini.";
-        saveLocalImport(
-          {
-            company,
-            reportType: type,
-            fileName: file.name,
-            sheetName: selected.name,
-            rows,
-          },
-          strategy === "replace" ? "replace" : "new",
-        );
-        setDuplicate(false);
-        setSuccess(message);
-        onDone(message);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Data gagal disimpan.");
-      } finally {
-        setBusy("");
-      }
+      setError("Penyimpanan bersama belum terhubung. Data belum disimpan.");
       return;
     }
     setBusy("Menyimpan data...");
@@ -325,9 +295,7 @@ function Importer({
       if (!res.ok) {
         if (res.status === 503) {
           setDatabaseAvailable(false);
-          setBusy("");
-          setTimeout(() => save(strategy), 0);
-          return;
+          throw new Error("Penyimpanan bersama belum terhubung. Data belum disimpan.");
         }
         throw new Error(d.error);
       }
@@ -397,9 +365,9 @@ function Importer({
         </div>
         {databaseAvailable === false && (
           <div className="mt-4 text-sm text-gold-300">
-            <b>Mode Lokal</b>
+            <b>Penyimpanan bersama belum terhubung</b>
             <br />
-            Data akan disimpan di browser ini.
+            Data tidak akan disimpan sampai Vercel Blob terhubung.
           </div>
         )}
       </Panel>
@@ -487,11 +455,6 @@ function Importer({
       {success && (
         <div className="success">
           <b>{success}</b>
-          {databaseAvailable === false && (
-            <p className="mt-1 text-sm">
-              Mode Lokal — database belum terhubung.
-            </p>
-          )}
           <div className="mt-3">
             <Link
               className="gold-button"
@@ -518,18 +481,8 @@ function History({
   const [items, setItems] = useState<History[]>([]),
     [databaseAvailable, setDatabaseAvailable] = useState(false);
   const load = useCallback(async () => {
-    const local: History[] = getLocalHistory(company).map((x) => ({
-      id: x.id,
-      company: x.company,
-      report_type: x.reportType,
-      file_name: x.fileName,
-      sheet_name: x.sheetName,
-      row_count: x.rowCount,
-      created_at: x.createdAt,
-      storageMode: "local",
-    }));
     try {
-      const health = await fetch("/api/database/health");
+      const health = await fetch("/api/storage/health");
       const status = await health.json();
       if (health.ok && status.connected) {
         setDatabaseAvailable(true);
@@ -539,11 +492,11 @@ function History({
           ? d.map((x: Omit<History, "storageMode">) => ({
               ...x,
               company: x.company,
-              storageMode: "database",
+              storageMode: "vercel-blob",
             }))
           : [];
         setItems(
-          [...local, ...database].sort((a, b) =>
+          database.sort((a, b) =>
             b.created_at.localeCompare(a.created_at),
           ),
         );
@@ -551,18 +504,15 @@ function History({
       }
     } catch {}
     setDatabaseAvailable(false);
-    setItems(local);
+    setItems([]);
   }, [company]);
   useEffect(() => {
     void load();
-    window.addEventListener("budgeting-local-data-changed", load);
-    return () =>
-      window.removeEventListener("budgeting-local-data-changed", load);
+    return undefined;
   }, [load]);
   async function remove(item: History) {
     if (!confirm("Hapus batch import dan seluruh barisnya?")) return;
-    if (item.storageMode === "local") removeLocalImport(item.id);
-    else await fetch(`/api/imports/${item.id}`, { method: "DELETE" });
+    await fetch(`/api/imports/${item.id}?company=${item.company}&reportType=${item.report_type}`, { method: "DELETE" });
     void load();
     reload();
   }
@@ -570,7 +520,7 @@ function History({
     <Panel title="Riwayat Import">
       {!databaseAvailable && (
         <p className="mb-3 text-sm text-gold-300">
-          Mode Lokal aktif. Data disimpan di browser ini.
+          Penyimpanan bersama belum terhubung.
         </p>
       )}
       <div className="overflow-x-auto">
@@ -596,7 +546,7 @@ function History({
                 <td>{x.sheet_name}</td>
                 <td>{x.row_count}</td>
                 <td>{new Date(x.created_at).toLocaleString("id-ID")}</td>
-                <td>{x.storageMode === "local" ? "Lokal" : "Database"}</td>
+                <td>Vercel Blob</td>
                 <td>
                   <Link
                     className="text-gold-300"
@@ -826,7 +776,7 @@ export default function DashboardApp() {
     const pairs = await Promise.all(
       types.map(async (type) => {
         try {
-          const health = await fetch("/api/database/health"),
+          const health = await fetch("/api/storage/health"),
             status = await health.json();
           if (health.ok && status.configured && status.connected) {
             const r = await fetch(
@@ -836,7 +786,7 @@ export default function DashboardApp() {
             if (r.ok && Array.isArray(d)) return [type, d] as const;
           }
         } catch {}
-        return [type, getLocalRows(company, type as ReportType)] as const;
+        return [type, []] as const;
       }),
     );
     setDatasets((x) => ({ ...x, ...Object.fromEntries(pairs) }));
@@ -862,8 +812,7 @@ export default function DashboardApp() {
     content = (
       <Panel title="Pengaturan Aplikasi">
         <p className="text-zinc-400">
-          Penyimpanan database digunakan jika Supabase tersedia. Jika belum
-          tersedia, import disimpan secara lokal di browser.
+          Data laporan disimpan bersama menggunakan Private Vercel Blob.
         </p>
       </Panel>
     );
@@ -874,9 +823,6 @@ export default function DashboardApp() {
         {notice && (
           <div className="success">
             <b>{notice}</b>
-            <p className="mt-1 text-sm">
-              Mode Lokal — database belum terhubung.
-            </p>
           </div>
         )}
         <div className="flex justify-end">
