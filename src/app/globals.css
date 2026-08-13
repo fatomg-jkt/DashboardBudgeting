@@ -22,3 +22,16 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .error { @apply rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-red-200; }
   .success { @apply rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-100; }
 }
+
+/* Sidebar branding: use the exact uploaded 1001 and Maison Y logos only. */
+aside > div:first-child {
+  min-height: 118px;
+  background-image: url('/logo-1001.jpg'), url('/logo-maison-y.jpg');
+  background-repeat: no-repeat, no-repeat;
+  background-size: 46% auto, 46% auto;
+  background-position: left 8px center, right 8px center;
+}
+aside > div:first-child > p,
+aside > div:first-child > h1 {
+  visibility: hidden;
+}
