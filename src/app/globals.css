@@ -23,15 +23,26 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .success { @apply rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-100; }
 }
 
-/* Sidebar branding: use the exact uploaded 1001 and Maison Y logos only. */
+/* Sidebar branding: keep the uploaded logos medium-sized with the company text below. */
 aside > div:first-child {
-  min-height: 118px;
+  min-height: 150px;
+  padding-top: 100px;
+  padding-bottom: 12px;
+  text-align: center;
   background-image: url('/logo-1001.jpg'), url('/logo-maison-y.jpg');
   background-repeat: no-repeat, no-repeat;
-  background-size: 46% auto, 46% auto;
-  background-position: left 8px center, right 8px center;
+  background-size: 74px auto, 74px auto;
+  background-position: left 32px top 14px, right 32px top 14px;
 }
 aside > div:first-child > p,
 aside > div:first-child > h1 {
-  visibility: hidden;
+  visibility: visible;
+}
+aside > div:first-child > p {
+  margin-top: 0;
+}
+aside > div:first-child > h1 {
+  margin-top: 2px;
+  font-size: 0.9rem;
+  line-height: 1.25rem;
 }
