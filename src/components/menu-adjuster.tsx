@@ -85,6 +85,12 @@ export default function MenuAdjuster() {
       const sisaDetailActive =
         window.location.pathname === "/laporan-budget" &&
         params.get("view") === "sisa-budget-detail-biaya";
+      const analisaCurrentActive =
+        window.location.pathname === "/analisis-variance" &&
+        params.get("view") === "current-month";
+      const analisaDecemberActive =
+        window.location.pathname === "/analisis-variance" &&
+        params.get("view") === "through-december";
 
       document
         .querySelectorAll<HTMLAnchorElement>('a[href="/budget-vs-actual"]')
@@ -182,7 +188,6 @@ export default function MenuAdjuster() {
           const budgetSubmenus = [budgetDept, budgetDetail];
           const sisaSubmenus = [sisaDept, sisaDetail];
 
-          // Semua submenu tersembunyi secara default dan hanya muncul saat head menu diklik.
           const budgetShouldOpen = budgetDeptActive || budgetDetailActive;
           const sisaShouldOpen = sisaDeptActive || sisaDetailActive;
           setSubmenuVisible(budgetSubmenus, budgetShouldOpen);
@@ -192,6 +197,54 @@ export default function MenuAdjuster() {
 
           bindHeadToggle(budgetLink, budgetSubmenus);
           bindHeadToggle(sisa, sisaSubmenus);
+        });
+
+      // Tambahkan submenu collapsible khusus Analisa Budget.
+      document
+        .querySelectorAll<HTMLAnchorElement>('a[href="/analisis-variance"]')
+        .forEach((analisaLink) => {
+          const parent = analisaLink.parentElement;
+          if (!parent) return;
+
+          let currentMonth = parent.querySelector<HTMLAnchorElement>(
+            'a[data-analisa-submenu="current-month"]',
+          );
+          if (!currentMonth) {
+            currentMonth = analisaLink.cloneNode(true) as HTMLAnchorElement;
+            currentMonth.href = "/analisis-variance?view=current-month";
+            currentMonth.dataset.analisaSubmenu = "current-month";
+            currentMonth.setAttribute("aria-label", "Current Month Report");
+            setMenuLabel(currentMonth, "Current Month Report");
+            currentMonth.classList.add("ml-6");
+            makeInactive(currentMonth);
+            analisaLink.insertAdjacentElement("afterend", currentMonth);
+          }
+
+          let throughDecember = parent.querySelector<HTMLAnchorElement>(
+            'a[data-analisa-submenu="through-december"]',
+          );
+          if (!throughDecember) {
+            throughDecember = analisaLink.cloneNode(true) as HTMLAnchorElement;
+            throughDecember.href = "/analisis-variance?view=through-december";
+            throughDecember.dataset.analisaSubmenu = "through-december";
+            throughDecember.setAttribute("aria-label", "Through December Report");
+            setMenuLabel(throughDecember, "Through December Report");
+            throughDecember.classList.add("ml-6");
+            makeInactive(throughDecember);
+            currentMonth.insertAdjacentElement("afterend", throughDecember);
+          }
+
+          if (analisaCurrentActive) makeActive(currentMonth);
+          else makeInactive(currentMonth);
+
+          if (analisaDecemberActive) makeActive(throughDecember);
+          else makeInactive(throughDecember);
+
+          const analisaSubmenus = [currentMonth, throughDecember];
+          const analisaShouldOpen = analisaCurrentActive || analisaDecemberActive;
+          setSubmenuVisible(analisaSubmenus, analisaShouldOpen);
+          analisaLink.setAttribute("aria-expanded", analisaShouldOpen ? "true" : "false");
+          bindHeadToggle(analisaLink, analisaSubmenus);
         });
 
       if (sisaHeadActive || sisaDeptActive || sisaDetailActive) {
