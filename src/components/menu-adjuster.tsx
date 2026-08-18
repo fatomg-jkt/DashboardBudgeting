@@ -29,6 +29,28 @@ function makeActive(link: HTMLAnchorElement) {
   if (!link.classList.contains("text-xs")) link.classList.add("font-semibold");
 }
 
+function setSubmenuVisible(links: HTMLAnchorElement[], visible: boolean) {
+  links.forEach((link) => {
+    link.style.display = visible ? "" : "none";
+    link.setAttribute("aria-hidden", visible ? "false" : "true");
+    link.tabIndex = visible ? 0 : -1;
+  });
+}
+
+function bindHeadToggle(head: HTMLAnchorElement, submenus: HTMLAnchorElement[]) {
+  if (head.dataset.submenuToggleBound === "true") return;
+
+  head.dataset.submenuToggleBound = "true";
+  head.setAttribute("aria-expanded", "false");
+
+  head.addEventListener("click", (event) => {
+    event.preventDefault();
+    const willOpen = head.getAttribute("aria-expanded") !== "true";
+    head.setAttribute("aria-expanded", willOpen ? "true" : "false");
+    setSubmenuVisible(submenus, willOpen);
+  });
+}
+
 export default function MenuAdjuster() {
   const pathname = usePathname();
 
@@ -48,15 +70,21 @@ export default function MenuAdjuster() {
         .forEach((link) => setMenuLabel(link, "Analisa Budget"));
 
       const params = new URLSearchParams(window.location.search);
-      const sisaActive =
-        window.location.pathname === "/laporan-budget" &&
-        params.get("view") === "sisa-budget";
       const budgetDeptActive =
         window.location.pathname === "/budget-vs-actual" &&
         params.get("view") === "per-departemen";
       const budgetDetailActive =
         window.location.pathname === "/budget-vs-actual" &&
         params.get("view") === "detail-biaya";
+      const sisaHeadActive =
+        window.location.pathname === "/laporan-budget" &&
+        params.get("view") === "sisa-budget";
+      const sisaDeptActive =
+        window.location.pathname === "/laporan-budget" &&
+        params.get("view") === "sisa-budget-per-departemen";
+      const sisaDetailActive =
+        window.location.pathname === "/laporan-budget" &&
+        params.get("view") === "sisa-budget-detail-biaya";
 
       document
         .querySelectorAll<HTMLAnchorElement>('a[href="/budget-vs-actual"]')
@@ -71,30 +99,30 @@ export default function MenuAdjuster() {
             parent.insertBefore(pengajuan, budgetLink);
           }
 
-          let subDept = parent.querySelector<HTMLAnchorElement>(
+          let budgetDept = parent.querySelector<HTMLAnchorElement>(
             'a[data-budget-submenu="per-departemen"]',
           );
-          if (!subDept) {
-            subDept = budgetLink.cloneNode(true) as HTMLAnchorElement;
-            subDept.href = "/budget-vs-actual?view=per-departemen";
-            subDept.dataset.budgetSubmenu = "per-departemen";
-            setMenuLabel(subDept, "Laporan Per Departemen");
-            subDept.classList.add("ml-6");
-            makeInactive(subDept);
-            budgetLink.insertAdjacentElement("afterend", subDept);
+          if (!budgetDept) {
+            budgetDept = budgetLink.cloneNode(true) as HTMLAnchorElement;
+            budgetDept.href = "/budget-vs-actual?view=per-departemen";
+            budgetDept.dataset.budgetSubmenu = "per-departemen";
+            setMenuLabel(budgetDept, "Laporan Per Departemen");
+            budgetDept.classList.add("ml-6");
+            makeInactive(budgetDept);
+            budgetLink.insertAdjacentElement("afterend", budgetDept);
           }
 
-          let subDetail = parent.querySelector<HTMLAnchorElement>(
+          let budgetDetail = parent.querySelector<HTMLAnchorElement>(
             'a[data-budget-submenu="detail-biaya"]',
           );
-          if (!subDetail) {
-            subDetail = budgetLink.cloneNode(true) as HTMLAnchorElement;
-            subDetail.href = "/budget-vs-actual?view=detail-biaya";
-            subDetail.dataset.budgetSubmenu = "detail-biaya";
-            setMenuLabel(subDetail, "Laporan Per Detail Biaya");
-            subDetail.classList.add("ml-6");
-            makeInactive(subDetail);
-            subDept.insertAdjacentElement("afterend", subDetail);
+          if (!budgetDetail) {
+            budgetDetail = budgetLink.cloneNode(true) as HTMLAnchorElement;
+            budgetDetail.href = "/budget-vs-actual?view=detail-biaya";
+            budgetDetail.dataset.budgetSubmenu = "detail-biaya";
+            setMenuLabel(budgetDetail, "Laporan Per Detail Biaya");
+            budgetDetail.classList.add("ml-6");
+            makeInactive(budgetDetail);
+            budgetDept.insertAdjacentElement("afterend", budgetDetail);
           }
 
           let sisa = parent.querySelector<HTMLAnchorElement>(
@@ -107,20 +135,66 @@ export default function MenuAdjuster() {
             sisa.setAttribute("aria-label", "Laporan Sisa Budget");
             setMenuLabel(sisa, "Laporan Sisa Budget");
             makeInactive(sisa);
-            subDetail.insertAdjacentElement("afterend", sisa);
+            budgetDetail.insertAdjacentElement("afterend", sisa);
           }
 
-          if (budgetDeptActive) makeActive(subDept);
-          else makeInactive(subDept);
+          let sisaDept = parent.querySelector<HTMLAnchorElement>(
+            'a[data-sisa-submenu="per-departemen"]',
+          );
+          if (!sisaDept) {
+            sisaDept = budgetLink.cloneNode(true) as HTMLAnchorElement;
+            sisaDept.href = "/laporan-budget?view=sisa-budget-per-departemen";
+            sisaDept.dataset.sisaSubmenu = "per-departemen";
+            setMenuLabel(sisaDept, "Laporan Per Departemen");
+            sisaDept.classList.add("ml-6");
+            makeInactive(sisaDept);
+            sisa.insertAdjacentElement("afterend", sisaDept);
+          }
 
-          if (budgetDetailActive) makeActive(subDetail);
-          else makeInactive(subDetail);
+          let sisaDetail = parent.querySelector<HTMLAnchorElement>(
+            'a[data-sisa-submenu="detail-biaya"]',
+          );
+          if (!sisaDetail) {
+            sisaDetail = budgetLink.cloneNode(true) as HTMLAnchorElement;
+            sisaDetail.href = "/laporan-budget?view=sisa-budget-detail-biaya";
+            sisaDetail.dataset.sisaSubmenu = "detail-biaya";
+            setMenuLabel(sisaDetail, "Laporan Per Detail Biaya");
+            sisaDetail.classList.add("ml-6");
+            makeInactive(sisaDetail);
+            sisaDept.insertAdjacentElement("afterend", sisaDetail);
+          }
 
-          if (sisaActive) makeActive(sisa);
+          if (budgetDeptActive) makeActive(budgetDept);
+          else makeInactive(budgetDept);
+
+          if (budgetDetailActive) makeActive(budgetDetail);
+          else makeInactive(budgetDetail);
+
+          if (sisaHeadActive) makeActive(sisa);
           else makeInactive(sisa);
+
+          if (sisaDeptActive) makeActive(sisaDept);
+          else makeInactive(sisaDept);
+
+          if (sisaDetailActive) makeActive(sisaDetail);
+          else makeInactive(sisaDetail);
+
+          const budgetSubmenus = [budgetDept, budgetDetail];
+          const sisaSubmenus = [sisaDept, sisaDetail];
+
+          // Semua submenu tersembunyi secara default dan hanya muncul saat head menu diklik.
+          const budgetShouldOpen = budgetDeptActive || budgetDetailActive;
+          const sisaShouldOpen = sisaDeptActive || sisaDetailActive;
+          setSubmenuVisible(budgetSubmenus, budgetShouldOpen);
+          setSubmenuVisible(sisaSubmenus, sisaShouldOpen);
+          budgetLink.setAttribute("aria-expanded", budgetShouldOpen ? "true" : "false");
+          sisa.setAttribute("aria-expanded", sisaShouldOpen ? "true" : "false");
+
+          bindHeadToggle(budgetLink, budgetSubmenus);
+          bindHeadToggle(sisa, sisaSubmenus);
         });
 
-      if (sisaActive) {
+      if (sisaHeadActive || sisaDeptActive || sisaDetailActive) {
         document
           .querySelectorAll<HTMLAnchorElement>('a[href="/laporan-budget"]')
           .forEach(makeInactive);
