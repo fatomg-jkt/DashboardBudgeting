@@ -57,7 +57,7 @@ export default function MenuAdjuster() {
   useEffect(() => {
     const applyMenuChanges = () => {
       document
-        .querySelectorAll<HTMLAnchorElement>('a[href="/budget-planning"]')
+        .querySelectorAll<HTMLAnchorElement>('a[href="/budget-planning"], a[href="/monitoring-budget"]')
         .forEach((link) => {
           link.style.display = "none";
           link.setAttribute("aria-hidden", "true");
