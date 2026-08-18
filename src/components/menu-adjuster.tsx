@@ -34,7 +34,6 @@ export default function MenuAdjuster() {
 
   useEffect(() => {
     const applyMenuChanges = () => {
-      // 1) Hapus menu Budget Planning dari desktop dan mobile navigation.
       document
         .querySelectorAll<HTMLAnchorElement>('a[href="/budget-planning"]')
         .forEach((link) => {
@@ -43,12 +42,22 @@ export default function MenuAdjuster() {
           link.tabIndex = -1;
         });
 
+      // Ubah label Analisis Variance menjadi Analisa Budget.
+      document
+        .querySelectorAll<HTMLAnchorElement>('a[href="/analisis-variance"]')
+        .forEach((link) => setMenuLabel(link, "Analisa Budget"));
+
+      const params = new URLSearchParams(window.location.search);
       const sisaActive =
         window.location.pathname === "/laporan-budget" &&
-        new URLSearchParams(window.location.search).get("view") === "sisa-budget";
+        params.get("view") === "sisa-budget";
+      const budgetDeptActive =
+        window.location.pathname === "/budget-vs-actual" &&
+        params.get("view") === "per-departemen";
+      const budgetDetailActive =
+        window.location.pathname === "/budget-vs-actual" &&
+        params.get("view") === "detail-biaya";
 
-      // 2 + 3) Pindahkan Pengajuan Budget ke atas Budget vs Actual,
-      // lalu tambahkan Laporan Sisa Budget tepat di bawah Budget vs Actual.
       document
         .querySelectorAll<HTMLAnchorElement>('a[href="/budget-vs-actual"]')
         .forEach((budgetLink) => {
@@ -62,10 +71,35 @@ export default function MenuAdjuster() {
             parent.insertBefore(pengajuan, budgetLink);
           }
 
+          let subDept = parent.querySelector<HTMLAnchorElement>(
+            'a[data-budget-submenu="per-departemen"]',
+          );
+          if (!subDept) {
+            subDept = budgetLink.cloneNode(true) as HTMLAnchorElement;
+            subDept.href = "/budget-vs-actual?view=per-departemen";
+            subDept.dataset.budgetSubmenu = "per-departemen";
+            setMenuLabel(subDept, "Laporan Per Departemen");
+            subDept.classList.add("ml-6");
+            makeInactive(subDept);
+            budgetLink.insertAdjacentElement("afterend", subDept);
+          }
+
+          let subDetail = parent.querySelector<HTMLAnchorElement>(
+            'a[data-budget-submenu="detail-biaya"]',
+          );
+          if (!subDetail) {
+            subDetail = budgetLink.cloneNode(true) as HTMLAnchorElement;
+            subDetail.href = "/budget-vs-actual?view=detail-biaya";
+            subDetail.dataset.budgetSubmenu = "detail-biaya";
+            setMenuLabel(subDetail, "Laporan Per Detail Biaya");
+            subDetail.classList.add("ml-6");
+            makeInactive(subDetail);
+            subDept.insertAdjacentElement("afterend", subDetail);
+          }
+
           let sisa = parent.querySelector<HTMLAnchorElement>(
             'a[data-menu-sisa-budget="true"]',
           );
-
           if (!sisa) {
             sisa = budgetLink.cloneNode(true) as HTMLAnchorElement;
             sisa.href = "/laporan-budget?view=sisa-budget";
@@ -73,14 +107,19 @@ export default function MenuAdjuster() {
             sisa.setAttribute("aria-label", "Laporan Sisa Budget");
             setMenuLabel(sisa, "Laporan Sisa Budget");
             makeInactive(sisa);
-            budgetLink.insertAdjacentElement("afterend", sisa);
+            subDetail.insertAdjacentElement("afterend", sisa);
           }
+
+          if (budgetDeptActive) makeActive(subDept);
+          else makeInactive(subDept);
+
+          if (budgetDetailActive) makeActive(subDetail);
+          else makeInactive(subDetail);
 
           if (sisaActive) makeActive(sisa);
           else makeInactive(sisa);
         });
 
-      // Saat Laporan Sisa Budget aktif, jangan tandai Laporan Budget biasa sebagai aktif.
       if (sisaActive) {
         document
           .querySelectorAll<HTMLAnchorElement>('a[href="/laporan-budget"]')
