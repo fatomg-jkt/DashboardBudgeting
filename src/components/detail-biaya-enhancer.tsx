@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Upload, X } from "lucide-react";
 import { detectHeaderRow, downloadTemplate } from "@/lib/import-utils";
@@ -10,14 +10,48 @@ type Sheet = { name: string; rows: string[][] };
 type DetailRow = {
   deskripsi_coa: string;
   department: string;
+  periode: string;
   anggaran: number;
   aktual: number;
 };
-
 type ApiRow = Record<string, unknown>;
+
+type DepartmentPair = {
+  department: string;
+  budgetIndex: number;
+  actualIndex: number;
+};
 
 const nf = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
 const pf = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
+
+const PERIODS = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+] as const;
+
+const DEPARTMENTS = [
+  "DEVELOPMENT",
+  "FAT",
+  "HRD",
+  "MANAGEMENT KIKI",
+  "MANAGEMENT UMA",
+  "MARKETING",
+  "MERCHANDISE",
+  "OPERASIONAL",
+  "PURCHASING",
+  "WAREHOUSE",
+] as const;
 
 function normalizeHeader(value: unknown) {
   return String(value ?? "")
@@ -47,69 +81,175 @@ function numberValue(value: unknown) {
   return negative ? -Math.abs(parsed) : parsed;
 }
 
-function inferDepartment(header: string) {
-  return header
-    .replace(/\s*[-–—:]?\s*(aktual|actual|anggaran|budget)\s*$/i, "")
+function normalizeDepartment(value: unknown) {
+  return String(value ?? "")
     .trim()
+    .replace(/\s+/g, " ")
     .toUpperCase();
+}
+
+function inferDepartment(header: string) {
+  return normalizeDepartment(
+    header.replace(/\s*[-–—:]?\s*(aktual|actual|anggaran|budget)\s*$/i, ""),
+  );
+}
+
+function normalizePeriod(value: unknown) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return "";
+  const aliases: Record<string, string> = {
+    jan: "Januari",
+    januari: "Januari",
+    january: "Januari",
+    feb: "Februari",
+    februari: "Februari",
+    february: "Februari",
+    mar: "Maret",
+    maret: "Maret",
+    march: "Maret",
+    apr: "April",
+    april: "April",
+    mei: "Mei",
+    may: "Mei",
+    jun: "Juni",
+    juni: "Juni",
+    june: "Juni",
+    jul: "Juli",
+    juli: "Juli",
+    july: "Juli",
+    agu: "Agustus",
+    agustus: "Agustus",
+    aug: "Agustus",
+    august: "Agustus",
+    sep: "September",
+    september: "September",
+    okt: "Oktober",
+    oktober: "Oktober",
+    oct: "Oktober",
+    october: "Oktober",
+    nov: "November",
+    november: "November",
+    des: "Desember",
+    desember: "Desember",
+    dec: "Desember",
+    december: "Desember",
+  };
+  if (aliases[raw]) return aliases[raw];
+  for (const [alias, period] of Object.entries(aliases)) {
+    if (raw.includes(alias)) return period;
+  }
+  return String(value ?? "").trim();
+}
+
+function discoverDepartmentPairs(headers: string[]): DepartmentPair[] {
+  const normalized = headers.map(normalizeHeader);
+  const map = new Map<string, { budgetIndex?: number; actualIndex?: number }>();
+
+  normalized.forEach((header, index) => {
+    const budgetMatch = header.match(/^(.*)_(anggaran|budget)$/);
+    const actualMatch = header.match(/^(.*)_(aktual|actual)$/);
+    if (budgetMatch?.[1]) {
+      const department = normalizeDepartment(budgetMatch[1].replace(/_/g, " "));
+      const current = map.get(department) ?? {};
+      current.budgetIndex = index;
+      map.set(department, current);
+    }
+    if (actualMatch?.[1]) {
+      const department = normalizeDepartment(actualMatch[1].replace(/_/g, " "));
+      const current = map.get(department) ?? {};
+      current.actualIndex = index;
+      map.set(department, current);
+    }
+  });
+
+  return Array.from(map.entries())
+    .filter(([, indexes]) => indexes.budgetIndex !== undefined && indexes.actualIndex !== undefined)
+    .map(([department, indexes]) => ({
+      department,
+      budgetIndex: indexes.budgetIndex as number,
+      actualIndex: indexes.actualIndex as number,
+    }));
 }
 
 function parseSheet(sheet: Sheet, headerRow: number): DetailRow[] {
   const headers = (sheet.rows[headerRow] ?? []).map((value) => String(value ?? "").trim());
   const normalized = headers.map(normalizeHeader);
-
   const coaIndex = normalized.findIndex(
     (value) => value.includes("deskripsi") || value.includes("coa") || value === "description",
+  );
+  if (coaIndex < 0) return [];
+
+  const periodIndex = normalized.findIndex((value) =>
+    ["periode", "period", "bulan", "month"].includes(value),
   );
   const departmentIndex = normalized.findIndex((value) =>
     ["department", "departemen", "dept"].includes(value),
   );
-  const budgetIndex = normalized.findIndex(
-    (value) =>
-      value === "anggaran" ||
-      value === "budget" ||
-      value.endsWith("_anggaran") ||
-      value.endsWith("_budget"),
+  const genericBudgetIndex = normalized.findIndex((value) =>
+    ["anggaran", "budget"].includes(value),
   );
-  const actualIndex = normalized.findIndex(
-    (value) =>
-      value === "aktual" ||
-      value === "actual" ||
-      value.endsWith("_aktual") ||
-      value.endsWith("_actual"),
+  const genericActualIndex = normalized.findIndex((value) =>
+    ["aktual", "actual"].includes(value),
   );
 
-  if (coaIndex < 0 || budgetIndex < 0 || actualIndex < 0) return [];
+  const namedPairs = discoverDepartmentPairs(headers);
+  const fallbackPeriod = normalizePeriod(sheet.name);
+  const result: DetailRow[] = [];
 
-  const inferredDepartment = inferDepartment(headers[actualIndex] || headers[budgetIndex]);
+  sheet.rows.slice(headerRow + 1).forEach((row) => {
+    const coa = String(row[coaIndex] ?? "").trim();
+    if (!coa) return;
+    const periode =
+      normalizePeriod(periodIndex >= 0 ? row[periodIndex] : "") || fallbackPeriod || "Semua Periode";
 
-  return sheet.rows
-    .slice(headerRow + 1)
-    .map((row): DetailRow => ({
-      deskripsi_coa: String(row[coaIndex] ?? "").trim(),
-      department: String(
-        departmentIndex >= 0 ? row[departmentIndex] ?? "" : inferredDepartment,
-      )
-        .trim()
-        .toUpperCase(),
-      anggaran: numberValue(row[budgetIndex]),
-      aktual: numberValue(row[actualIndex]),
-    }))
-    .filter((row) => row.deskripsi_coa.length > 0 && row.department.length > 0);
+    if (departmentIndex >= 0 && genericBudgetIndex >= 0 && genericActualIndex >= 0) {
+      const department = normalizeDepartment(row[departmentIndex]);
+      if (department) {
+        result.push({
+          deskripsi_coa: coa,
+          department,
+          periode,
+          anggaran: numberValue(row[genericBudgetIndex]),
+          aktual: numberValue(row[genericActualIndex]),
+        });
+      }
+    }
+
+    namedPairs.forEach((pair) => {
+      result.push({
+        deskripsi_coa: coa,
+        department: pair.department,
+        periode,
+        anggaran: numberValue(row[pair.budgetIndex]),
+        aktual: numberValue(row[pair.actualIndex]),
+      });
+    });
+  });
+
+  return result.filter((row) => row.department.length > 0);
+}
+
+function parseAllSheets(sheets: Sheet[]) {
+  return sheets.flatMap((sheet) => parseSheet(sheet, detectHeaderRow(sheet.rows)));
 }
 
 function fromApiRow(value: unknown): DetailRow | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const row = value as ApiRow;
   const deskripsi = String(row.deskripsi_coa ?? row.deskripsi ?? row.description ?? "").trim();
-  const department = String(row.department ?? row.departemen ?? "").trim().toUpperCase();
+  const department = normalizeDepartment(row.department ?? row.departemen ?? "");
   if (!deskripsi || !department) return null;
   return {
     deskripsi_coa: deskripsi,
     department,
+    periode: normalizePeriod(row.periode ?? row.bulan ?? row.month ?? "") || "Semua Periode",
     anggaran: numberValue(row.anggaran ?? row.budget),
     aktual: numberValue(row.aktual ?? row.actual),
   };
+}
+
+function isOverBudget(row: DetailRow) {
+  return row.aktual > row.anggaran;
 }
 
 function DepartmentTable({ department, rows }: { department: string; rows: DetailRow[] }) {
@@ -132,9 +272,12 @@ function DepartmentTable({ department, rows }: { department: string; rows: Detai
               : row.aktual > 0
                 ? 100
                 : 0;
-            const over = row.aktual > row.anggaran;
+            const over = isOverBudget(row);
             return (
-              <tr key={`${department}-${row.deskripsi_coa}-${index}`} className="border-b border-zinc-800">
+              <tr
+                key={`${department}-${row.periode}-${row.deskripsi_coa}-${index}`}
+                className="border-b border-zinc-800"
+              >
                 <td className="px-4 py-3">{row.deskripsi_coa}</td>
                 <td className="px-4 py-3 text-right">{nf.format(row.anggaran)}</td>
                 <td className="px-4 py-3 text-right">{nf.format(row.aktual)}</td>
@@ -180,7 +323,7 @@ function DetailTables({ rows, preview = false }: { rows: DetailRow[]; preview?: 
           {grouped.size > 1 && <h3 className="font-semibold text-gold-300">{department}</h3>}
           <DepartmentTable
             department={department}
-            rows={preview ? departmentRows.slice(0, 15) : departmentRows}
+            rows={preview ? departmentRows.slice(0, 12) : departmentRows}
           />
         </div>
       ))}
@@ -200,18 +343,19 @@ function UploadModal({
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [sheets, setSheets] = useState<Sheet[]>([]);
-  const [sheetIndex, setSheetIndex] = useState(0);
-  const [headerRow, setHeaderRow] = useState(0);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
 
-  const selectedSheet = sheets[sheetIndex];
-  const parsedRows = selectedSheet ? parseSheet(selectedSheet, headerRow) : [];
+  const parsedRows = useMemo(() => parseAllSheets(sheets), [sheets]);
+  const departmentCount = useMemo(
+    () => new Set(parsedRows.map((row) => row.department)).size,
+    [parsedRows],
+  );
 
   async function chooseFile(nextFile?: File) {
     if (!nextFile) return;
     setFile(nextFile);
-    setBusy("Membaca file Excel...");
+    setBusy("Membaca seluruh sheet dan departemen...");
     setError("");
     try {
       const formData = new FormData();
@@ -227,8 +371,6 @@ function UploadModal({
       const data = payload as { sheets?: Sheet[]; error?: string };
       if (!Array.isArray(data.sheets)) throw new Error(data.error || "File Excel gagal dibaca.");
       setSheets(data.sheets);
-      setSheetIndex(0);
-      setHeaderRow(detectHeaderRow(data.sheets[0]?.rows ?? []));
     } catch (caught) {
       setSheets([]);
       setError(caught instanceof Error ? caught.message : "File Excel gagal dibaca.");
@@ -238,8 +380,8 @@ function UploadModal({
   }
 
   async function save(strategy: "cancel" | "replace" = "cancel") {
-    if (!file || !selectedSheet || parsedRows.length === 0) return;
-    setBusy("Menyimpan data...");
+    if (!file || parsedRows.length === 0) return;
+    setBusy("Menyimpan data semua departemen...");
     setError("");
     try {
       const response = await fetch("/api/report-import", {
@@ -249,8 +391,8 @@ function UploadModal({
           company,
           reportType: "budget_detail_biaya",
           fileName: file.name,
-          sheetName: selectedSheet.name,
-          headers: ["deskripsi_coa", "department", "anggaran", "aktual"],
+          sheetName: sheets.length > 1 ? "Semua Sheet" : sheets[0]?.name ?? "Sheet1",
+          headers: ["periode", "deskripsi_coa", "department", "anggaran", "aktual"],
           rows: parsedRows,
           strategy,
         }),
@@ -259,7 +401,7 @@ function UploadModal({
       const data = payload && typeof payload === "object" ? (payload as { error?: string }) : {};
 
       if (response.status === 409 && strategy === "cancel") {
-        if (window.confirm("Data Laporan Per Detail Biaya sudah ada. Ganti data lama?")) {
+        if (window.confirm("Data Laporan Per Detail Biaya yang sama sudah ada. Ganti data tersebut?")) {
           await save("replace");
         }
         return;
@@ -276,12 +418,12 @@ function UploadModal({
 
   return (
     <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/80 p-4 md:p-10">
-      <div className="mx-auto max-w-6xl rounded-2xl border border-gold-500/20 bg-zinc-950 p-5">
+      <div className="mx-auto max-w-7xl rounded-2xl border border-gold-500/20 bg-zinc-950 p-5">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">Upload Laporan Per Detail Biaya</h2>
             <p className="text-sm text-zinc-400">
-              Perusahaan: {company === "1001" ? "1001" : "Maison Y"}
+              Satu file dapat berisi seluruh departemen dan beberapa sheet.
             </p>
           </div>
           <button onClick={onClose} aria-label="Tutup">
@@ -311,55 +453,19 @@ function UploadModal({
         {busy && <p className="mt-4 text-gold-300">{busy}</p>}
         {error && <div className="error mt-4">{error}</div>}
 
-        {selectedSheet && (
+        {sheets.length > 0 && (
           <div className="mt-6 space-y-4">
-            <div className="grid gap-3 md:grid-cols-3">
-              <label className="text-sm">
-                Sheet
-                <select
-                  className="input mt-1 w-full"
-                  value={sheetIndex}
-                  onChange={(event) => {
-                    const index = Number(event.target.value);
-                    setSheetIndex(index);
-                    setHeaderRow(detectHeaderRow(sheets[index]?.rows ?? []));
-                  }}
-                >
-                  {sheets.map((sheet, index) => (
-                    <option key={`${sheet.name}-${index}`} value={index}>
-                      {sheet.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm">
-                Baris Header
-                <select
-                  className="input mt-1 w-full"
-                  value={headerRow}
-                  onChange={(event) => setHeaderRow(Number(event.target.value))}
-                >
-                  {Array.from(
-                    { length: Math.min(30, selectedSheet.rows.length) },
-                    (_, index) => (
-                      <option key={index} value={index}>
-                        Baris {index + 1}
-                      </option>
-                    ),
-                  )}
-                </select>
-              </label>
-              <div className="text-sm">
-                <span className="text-zinc-400">Data terbaca</span>
-                <p className="mt-2 font-semibold">{parsedRows.length} baris</p>
-              </div>
+            <div className="grid gap-3 rounded-xl border border-zinc-800 p-4 md:grid-cols-3">
+              <div><span className="text-xs text-zinc-400">Sheet terbaca</span><p className="font-semibold">{sheets.length}</p></div>
+              <div><span className="text-xs text-zinc-400">Departemen terbaca</span><p className="font-semibold">{departmentCount}</p></div>
+              <div><span className="text-xs text-zinc-400">Total data</span><p className="font-semibold">{parsedRows.length} baris</p></div>
             </div>
 
             {parsedRows.length > 0 ? (
               <DetailTables rows={parsedRows} preview />
             ) : (
               <div className="error">
-                Header wajib: Deskripsi COA, [Nama Departemen] - Anggaran dan [Nama Departemen] - Aktual.
+                Format belum dikenali. Gunakan Deskripsi COA dan pasangan kolom seperti DEVELOPMENT - Anggaran / DEVELOPMENT - Aktual. File boleh berisi pasangan kolom untuk semua departemen.
               </div>
             )}
 
@@ -369,7 +475,7 @@ function UploadModal({
                 className="gold-button disabled:opacity-40"
                 onClick={() => save()}
               >
-                {busy === "Menyimpan data..." ? "Menyimpan..." : "Import & Simpan"}
+                {busy.startsWith("Menyimpan") ? "Menyimpan..." : "Import & Simpan Semua Departemen"}
               </button>
             </div>
           </div>
@@ -386,6 +492,10 @@ export default function DetailBiayaEnhancer() {
   const [rows, setRows] = useState<DetailRow[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [periodFilter, setPeriodFilter] = useState("all");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [coaFilter, setCoaFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const syncCompany = useCallback(() => {
     setCompany(localStorage.getItem("budgeting_active_company") === "maison_y" ? "maison_y" : "1001");
@@ -447,6 +557,31 @@ export default function DetailBiayaEnhancer() {
     if (active) void loadRows();
   }, [active, loadRows]);
 
+  useEffect(() => {
+    setPeriodFilter("all");
+    setDepartmentFilter("all");
+    setCoaFilter("all");
+    setStatusFilter("all");
+  }, [company]);
+
+  const coaOptions = useMemo(
+    () => Array.from(new Set(rows.map((row) => row.deskripsi_coa))).sort((a, b) => a.localeCompare(b)),
+    [rows],
+  );
+
+  const filteredRows = useMemo(
+    () =>
+      rows.filter((row) => {
+        if (periodFilter !== "all" && row.periode !== periodFilter) return false;
+        if (departmentFilter !== "all" && row.department !== departmentFilter) return false;
+        if (coaFilter !== "all" && row.deskripsi_coa !== coaFilter) return false;
+        if (statusFilter === "over" && !isOverBudget(row)) return false;
+        if (statusFilter === "under" && isOverBudget(row)) return false;
+        return true;
+      }),
+    [rows, periodFilter, departmentFilter, coaFilter, statusFilter],
+  );
+
   if (!active || !host) return null;
 
   return createPortal(
@@ -476,20 +611,79 @@ export default function DetailBiayaEnhancer() {
         </div>
       </div>
 
+      <section className="rounded-2xl border border-zinc-800 bg-zinc-950/80 p-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <label className="text-xs text-zinc-400">
+            Periode
+            <select
+              className="input mt-1 w-full"
+              value={periodFilter}
+              onChange={(event) => setPeriodFilter(event.target.value)}
+            >
+              <option value="all">Semua Periode</option>
+              {PERIODS.map((period) => <option key={period} value={period}>{period}</option>)}
+            </select>
+          </label>
+
+          <label className="text-xs text-zinc-400">
+            Departemen
+            <select
+              className="input mt-1 w-full"
+              value={departmentFilter}
+              onChange={(event) => setDepartmentFilter(event.target.value)}
+            >
+              <option value="all">Semua Departemen</option>
+              {DEPARTMENTS.map((department) => (
+                <option key={department} value={department}>{department}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-xs text-zinc-400">
+            Deskripsi COA
+            <select
+              className="input mt-1 w-full"
+              value={coaFilter}
+              onChange={(event) => setCoaFilter(event.target.value)}
+            >
+              <option value="all">Semua Deskripsi COA</option>
+              {coaOptions.map((coa) => <option key={coa} value={coa}>{coa}</option>)}
+            </select>
+          </label>
+
+          <label className="text-xs text-zinc-400">
+            Status Budget
+            <select
+              className="input mt-1 w-full"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+            >
+              <option value="all">Semua Status</option>
+              <option value="over">Over Budget</option>
+              <option value="under">Under Budget</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
       {loading ? (
         <p>Memuat data...</p>
-      ) : rows.length > 0 ? (
-        <DetailTables rows={rows} />
-      ) : (
+      ) : rows.length === 0 ? (
         <section className="rounded-2xl border border-dashed border-gold-500/30 bg-zinc-950/60 p-12 text-center">
           <h2 className="text-xl font-semibold">Belum ada data Laporan Per Detail Biaya</h2>
           <p className="mt-2 text-zinc-400">
-            Upload Excel sesuai format Deskripsi COA, [Nama Departemen] - Anggaran dan [Nama Departemen] - Aktual.
+            Upload satu file Excel yang dapat berisi seluruh departemen.
           </p>
           <button className="gold-button mt-5" onClick={() => setModalOpen(true)}>
             Upload Excel
           </button>
         </section>
+      ) : filteredRows.length === 0 ? (
+        <section className="rounded-2xl border border-dashed border-zinc-700 bg-zinc-950/60 p-10 text-center text-zinc-400">
+          Tidak ada data yang sesuai dengan pilihan filter.
+        </section>
+      ) : (
+        <DetailTables rows={filteredRows} />
       )}
 
       {modalOpen && (
