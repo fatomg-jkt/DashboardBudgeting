@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Playfair_Display, Public_Sans } from 'next/font/google';
 import './globals.css';
+import './branding-fix.css';
 
 const playfairDisplay = Playfair_Display({
   subsets: ['latin'],
