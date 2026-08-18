@@ -3,6 +3,7 @@ import { Playfair_Display, Public_Sans } from 'next/font/google';
 import MenuAdjuster from '@/components/menu-adjuster';
 import AnalisaBudgetEnhancer from '@/components/analisa-budget-enhancer';
 import AnalisaBudgetRouteSync from '@/components/analisa-budget-route-sync';
+import DetailBiayaEnhancer from '@/components/detail-biaya-enhancer';
 import './globals.css';
 import './branding-fix.css';
 
@@ -32,6 +33,7 @@ export default function RootLayout({
         <MenuAdjuster />
         <AnalisaBudgetEnhancer />
         <AnalisaBudgetRouteSync />
+        <DetailBiayaEnhancer />
         {children}
         <style>{`
           h1, h2, h3 {
