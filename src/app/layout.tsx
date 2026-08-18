@@ -5,6 +5,7 @@ import MonitoringMenuHider from '@/components/monitoring-menu-hider';
 import AnalisaBudgetEnhancer from '@/components/analisa-budget-enhancer';
 import AnalisaBudgetRouteSync from '@/components/analisa-budget-route-sync';
 import DetailBiayaEnhancer from '@/components/detail-biaya-enhancer';
+import DetailBiayaPieChart from '@/components/detail-biaya-pie-chart';
 import './globals.css';
 import './branding-fix.css';
 
@@ -36,6 +37,7 @@ export default function RootLayout({
         <AnalisaBudgetEnhancer />
         <AnalisaBudgetRouteSync />
         <DetailBiayaEnhancer />
+        <DetailBiayaPieChart />
         {children}
         <style>{`
           h1, h2, h3 {
