@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Playfair_Display, Public_Sans } from 'next/font/google';
 import MenuAdjuster from '@/components/menu-adjuster';
 import AnalisaBudgetEnhancer from '@/components/analisa-budget-enhancer';
+import AnalisaBudgetRouteSync from '@/components/analisa-budget-route-sync';
 import './globals.css';
 import './branding-fix.css';
 
@@ -30,6 +31,7 @@ export default function RootLayout({
       <body style={{ fontFamily: 'var(--font-body), sans-serif' }}>
         <MenuAdjuster />
         <AnalisaBudgetEnhancer />
+        <AnalisaBudgetRouteSync />
         {children}
         <style>{`
           h1, h2, h3 {
