@@ -1,6 +1,6 @@
 import type { ReportType } from '@/lib/reports';
 
-const headerKeywords = new Set(['no','department','departemen','dept','budget','anggaran','actual','aktual','realisasi','variance','var','kategori','category','bulan','month','tahun','year','nominal','pic','status']);
+const headerKeywords = new Set(['no','department','departemen','dept','budget','anggaran','actual','aktual','realisasi','variance','var','kategori','category','bulan','month','tahun','year','nominal','pic','status','deskripsi','coa','description']);
 export const headerToken = (value: unknown) => String(value ?? '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
 export function detectHeaderRow(rows: string[][]) {
@@ -23,6 +23,7 @@ export const templates: Record<ReportType, { header: string; example: string; fi
   pengajuan_budget:{header:'tanggal,department,category,nominal,keterangan,pic,status',example:'2026-01-15,WAREHOUSE,Operasional,10000000,Pembelian perlengkapan,Budi,Draft',filename:'template-pengajuan-budget.csv'},
   analisis_variance:{header:'tahun,bulan,department,category,budget,actual',example:'2026,Januari,WAREHOUSE,Operasional,55200000,18183659',filename:'template-analisis-variance.csv'},
   laporan_budget:{header:'tahun,bulan,department,category,budget,actual,variance,variance_percent',example:'2026,Januari,WAREHOUSE,Operasional,55200000,18183659,37016341,67.06',filename:'template-laporan-budget.csv'},
+  budget_detail_biaya:{header:'deskripsi_coa,department,anggaran,aktual',example:'Beban Amortisasi Asuransi,DEVELOPMENT,4200000,8344373',filename:'template-laporan-detail-biaya.csv'},
   master_data:{header:'type,code,name,active',example:'department,WH,WAREHOUSE,true',filename:'template-master-data.csv'},
 };
 
