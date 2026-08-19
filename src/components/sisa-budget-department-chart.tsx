@@ -1,0 +1,118 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
+type Company = "1001" | "maison_y";
+type ApiRow = Record<string, unknown>;
+
+type Point = { department: string; budget: number; actual: number; remaining: number };
+
+const nf = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
+
+function num(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  let text = String(value ?? "").trim().replace(/^rp\s*/i, "").replace(/\s/g, "");
+  if (!text) return 0;
+  if (/^[-+]?\d{1,3}(\.\d{3})+(,\d+)?$/.test(text)) text = text.replaceAll(".", "").replace(",", ".");
+  else if (/^[-+]?\d{1,3}(,\d{3})+(\.\d+)?$/.test(text)) text = text.replaceAll(",", "");
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function value(row: ApiRow, keys: string[]) {
+  for (const key of keys) if (row[key] !== undefined) return row[key];
+  return undefined;
+}
+
+function axis(value: number) {
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000_000) return `${nf.format(value / 1_000_000_000)} M`;
+  if (abs >= 1_000_000) return `${nf.format(value / 1_000_000)} Jt`;
+  return nf.format(value);
+}
+
+export default function SisaBudgetDepartmentChart() {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  const [company, setCompany] = useState<Company>("1001");
+  const [rows, setRows] = useState<ApiRow[]>([]);
+
+  const active =
+    typeof window !== "undefined" &&
+    window.location.pathname === "/laporan-budget" &&
+    new URLSearchParams(window.location.search).get("view") === "sisa-budget-per-departemen";
+
+  const syncCompany = useCallback(() => {
+    setCompany(localStorage.getItem("budgeting_active_company") === "maison_y" ? "maison_y" : "1001");
+  }, []);
+
+  useEffect(() => {
+    if (!active) return;
+    syncCompany();
+    const main = document.querySelector("main");
+    const content = main?.children.item(1) as HTMLElement | null;
+    if (!content) return;
+    let mount = content.querySelector<HTMLElement>("[data-sisa-department-chart]");
+    if (!mount) {
+      mount = document.createElement("div");
+      mount.dataset.sisaDepartmentChart = "true";
+      content.insertBefore(mount, content.firstChild);
+    }
+    setHost(mount);
+    const click = () => window.setTimeout(syncCompany, 0);
+    document.addEventListener("click", click);
+    return () => document.removeEventListener("click", click);
+  }, [active, syncCompany]);
+
+  useEffect(() => {
+    if (!active) return;
+    fetch(`/api/reports?reportType=laporan_budget&company=${company}`, { cache: "no-store" })
+      .then(async (res) => {
+        const data: unknown = await res.json();
+        setRows(res.ok && Array.isArray(data) ? (data as ApiRow[]) : []);
+      })
+      .catch(() => setRows([]));
+  }, [active, company]);
+
+  const data = useMemo(() => {
+    const grouped = new Map<string, Point>();
+    rows.forEach((row) => {
+      const department = String(value(row, ["department", "departemen", "dept"]) ?? "").trim().toUpperCase();
+      if (!department) return;
+      const budget = num(value(row, ["budget", "anggaran"]));
+      const actual = num(value(row, ["actual", "aktual", "realisasi"]));
+      const current = grouped.get(department) ?? { department, budget: 0, actual: 0, remaining: 0 };
+      current.budget += budget;
+      current.actual += actual;
+      current.remaining += budget - actual;
+      grouped.set(department, current);
+    });
+    return Array.from(grouped.values());
+  }, [rows]);
+
+  if (!active || !host) return null;
+
+  return createPortal(
+    <section className="mb-6 rounded-2xl border border-gold-500/20 bg-zinc-950/80 p-5">
+      <h2 className="mb-1 text-lg font-semibold">Grafik Sisa Budget Per Departemen</h2>
+      <p className="mb-4 text-sm text-zinc-400">Sisa Budget = Anggaran - Aktual</p>
+      {data.length ? (
+        <div className="h-80 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data}>
+              <CartesianGrid stroke="#27272a" />
+              <XAxis dataKey="department" tick={{ fontSize: 11 }} interval={0} angle={-15} textAnchor="end" height={70} />
+              <YAxis tickFormatter={axis} />
+              <Tooltip formatter={(v: number | string) => `Rp ${nf.format(Number(v))}`} />
+              <Bar dataKey="remaining" name="Sisa Budget" fill="#2a9d8f" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="py-12 text-center text-zinc-500">Belum ada data Laporan Sisa Budget per Departemen.</div>
+      )}
+    </section>,
+    host,
+  );
+}
