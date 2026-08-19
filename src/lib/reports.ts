@@ -2,6 +2,8 @@ export const REPORTS = {
   budget_planning: 'Budget Planning',
   budget_vs_actual: 'Budget vs Actual',
   realisasi_budget: 'Realisasi Budget',
+  realisasi_bulanan: 'Laporan Realisasi Bulanan',
+  realisasi_per_departemen: 'Laporan Realisasi Per Departemen',
   monitoring_budget: 'Monitoring Budget',
   pengajuan_budget: 'Pengajuan Budget',
   analisis_variance: 'Analisis Variance',
