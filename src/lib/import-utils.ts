@@ -15,6 +15,9 @@ export function detectHeaderRow(rows: string[][]) {
   return best.index;
 }
 
+const detailHeader = 'Periode,Deskripsi (COA),DEVELOPMENT - Anggaran,DEVELOPMENT - Aktual,FAT - Anggaran,FAT - Aktual,HRD - Anggaran,HRD - Aktual,MANAGEMENT KIKI - Anggaran,MANAGEMENT KIKI - Aktual,MANAGEMENT UMA - Anggaran,MANAGEMENT UMA - Aktual,MARKETING - Anggaran,MARKETING - Aktual,MERCHANDISE - Anggaran,MERCHANDISE - Aktual,OPERASIONAL - Anggaran,OPERASIONAL - Aktual,PURCHASING - Anggaran,PURCHASING - Aktual,WAREHOUSE - Anggaran,WAREHOUSE - Aktual';
+const detailExample = 'Januari,Beban Amortisasi Asuransi,4200000,8344373,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
+
 export const templates: Record<ReportType, { header: string; example: string; filename: string }> = {
   budget_planning:{header:'tahun,bulan,department,category,budget,keterangan',example:'2026,Januari,WAREHOUSE,Operasional,55200000,Rencana tahunan',filename:'template-budget-planning.csv'},
   budget_vs_actual:{header:'tahun,bulan,department,category,budget,actual',example:'2026,Januari,WAREHOUSE,Operasional,55200000,18183659',filename:'template-budget-vs-actual.csv'},
@@ -23,11 +26,8 @@ export const templates: Record<ReportType, { header: string; example: string; fi
   pengajuan_budget:{header:'tanggal,department,category,nominal,keterangan,pic,status',example:'2026-01-15,WAREHOUSE,Operasional,10000000,Pembelian perlengkapan,Budi,Draft',filename:'template-pengajuan-budget.csv'},
   analisis_variance:{header:'tahun,bulan,department,category,budget,actual',example:'2026,Januari,WAREHOUSE,Operasional,55200000,18183659',filename:'template-analisis-variance.csv'},
   laporan_budget:{header:'tahun,bulan,department,category,budget,actual,variance,variance_percent',example:'2026,Januari,WAREHOUSE,Operasional,55200000,18183659,37016341,67.06',filename:'template-laporan-budget.csv'},
-  budget_detail_biaya:{
-    header:'Periode,Deskripsi (COA),DEVELOPMENT - Anggaran,DEVELOPMENT - Aktual,FAT - Anggaran,FAT - Aktual,HRD - Anggaran,HRD - Aktual,MANAGEMENT KIKI - Anggaran,MANAGEMENT KIKI - Aktual,MANAGEMENT UMA - Anggaran,MANAGEMENT UMA - Aktual,MARKETING - Anggaran,MARKETING - Aktual,MERCHANDISE - Anggaran,MERCHANDISE - Aktual,OPERASIONAL - Anggaran,OPERASIONAL - Aktual,PURCHASING - Anggaran,PURCHASING - Aktual,WAREHOUSE - Anggaran,WAREHOUSE - Aktual',
-    example:'Januari,Beban Amortisasi Asuransi,4200000,8344373,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0',
-    filename:'template-laporan-detail-biaya-semua-departemen.csv'
-  },
+  budget_detail_biaya:{header:detailHeader,example:detailExample,filename:'template-laporan-detail-biaya-semua-departemen.csv'},
+  sisa_budget_detail_biaya:{header:detailHeader,example:detailExample,filename:'template-laporan-sisa-budget-detail-biaya-semua-departemen.csv'},
   master_data:{header:'type,code,name,active',example:'department,WH,WAREHOUSE,true',filename:'template-master-data.csv'},
 };
 
