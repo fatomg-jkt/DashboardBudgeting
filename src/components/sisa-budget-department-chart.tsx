@@ -6,23 +6,36 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 
 type Company = "1001" | "maison_y";
 type ApiRow = Record<string, unknown>;
-
 type Point = { department: string; budget: number; actual: number; remaining: number };
 
 const nf = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
 
 function num(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  let text = String(value ?? "").trim().replace(/^rp\s*/i, "").replace(/\s/g, "");
-  if (!text) return 0;
-  if (/^[-+]?\d{1,3}(\.\d{3})+(,\d+)?$/.test(text)) text = text.replaceAll(".", "").replace(",", ".");
-  else if (/^[-+]?\d{1,3}(,\d{3})+(\.\d+)?$/.test(text)) text = text.replaceAll(",", "");
+  let text = String(value ?? "")
+    .trim()
+    .replace(/^rp\s*/i, "")
+    .replace(/%/g, "")
+    .replace(/\s/g, "");
+  if (!text || text === "-") return 0;
+  if (/^[-+]?\d{1,3}(\.\d{3})+(,\d+)?$/.test(text)) {
+    text = text.replaceAll(".", "").replace(",", ".");
+  } else if (/^[-+]?\d{1,3}(,\d{3})+(\.\d+)?$/.test(text)) {
+    text = text.replaceAll(",", "");
+  }
   const parsed = Number(text);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function key(value: string) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+}
+
 function value(row: ApiRow, keys: string[]) {
-  for (const key of keys) if (row[key] !== undefined) return row[key];
+  const wanted = new Set(keys.map(key));
+  for (const [name, cell] of Object.entries(row)) {
+    if (wanted.has(key(name))) return cell;
+  }
   return undefined;
 }
 
@@ -78,14 +91,20 @@ export default function SisaBudgetDepartmentChart() {
   const data = useMemo(() => {
     const grouped = new Map<string, Point>();
     rows.forEach((row) => {
-      const department = String(value(row, ["department", "departemen", "dept"]) ?? "").trim().toUpperCase();
+      const department = String(value(row, ["department", "departemen", "dept"]) ?? "")
+        .trim()
+        .toUpperCase();
       if (!department) return;
-      const budget = num(value(row, ["budget", "anggaran"]));
-      const actual = num(value(row, ["actual", "aktual", "realisasi"]));
+
+      const budget = num(value(row, ["total budget", "total_budget", "budget", "anggaran"]));
+      const actual = num(value(row, ["total aktual", "total_aktual", "total actual", "actual", "aktual", "realisasi"]));
+      const uploadedRemaining = value(row, ["sisa budget", "sisa_budget", "remaining", "remaining_budget"]);
+      const remaining = uploadedRemaining === undefined ? budget - actual : num(uploadedRemaining);
+
       const current = grouped.get(department) ?? { department, budget: 0, actual: 0, remaining: 0 };
       current.budget += budget;
       current.actual += actual;
-      current.remaining += budget - actual;
+      current.remaining += remaining;
       grouped.set(department, current);
     });
     return Array.from(grouped.values());
@@ -96,7 +115,7 @@ export default function SisaBudgetDepartmentChart() {
   return createPortal(
     <section className="mb-6 rounded-2xl border border-gold-500/20 bg-zinc-950/80 p-5">
       <h2 className="mb-1 text-lg font-semibold">Grafik Sisa Budget Per Departemen</h2>
-      <p className="mb-4 text-sm text-zinc-400">Sisa Budget = Anggaran - Aktual</p>
+      <p className="mb-4 text-sm text-zinc-400">Sisa Budget sesuai data Excel (fallback: Total Budget - Total Aktual)</p>
       {data.length ? (
         <div className="h-80 w-full">
           <ResponsiveContainer width="100%" height="100%">
