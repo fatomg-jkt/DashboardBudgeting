@@ -24,6 +24,8 @@ export const templates: Record<ReportType, { header: string; example: string; fi
   monthly_budget_actual:{header:'Tahun,Bulan,Budget,Actual,Selisih %,Status',example:'2026,April,1267433332,1651087912,30.27%,Over Budget',filename:'template-monthly-budget-vs-actual.csv'},
   cumulative_budget_actual_ytd:{header:'Perusahaan,Tahun,Bulan,Department,Cost Center,Kode Akun,Nama Akun,Kategori,Budget,Realisasi',example:'1001,2026,Januari,Marketing,MKT-01,6201,Iklan Digital,OPEX,600000000,500000000',filename:'template-cumulative-budget-vs-actual-ytd.csv'},
   realisasi_budget:{header:'tahun,bulan,department,category,actual,keterangan',example:'2026,Januari,WAREHOUSE,Operasional,18183659,Realisasi Januari',filename:'template-realisasi-budget.csv'},
+  realisasi_bulanan:{header:'Tahun,Bulan,Total Realisasi,Keterangan',example:'2026,Januari,18183659,Realisasi Januari',filename:'template-laporan-realisasi-bulanan.csv'},
+  realisasi_per_departemen:{header:'Tahun,Bulan,Departemen,Realisasi,Kategori,Keterangan',example:'2026,Januari,WAREHOUSE,18183659,Operasional,Realisasi Januari',filename:'template-laporan-realisasi-per-departemen.csv'},
   monitoring_budget:{header:'tahun,bulan,department,budget,actual,status',example:'2026,Januari,WAREHOUSE,55200000,18183659,Aman',filename:'template-monitoring-budget.csv'},
   pengajuan_budget:{header:'tanggal,department,category,nominal,keterangan,pic,status',example:'2026-01-15,WAREHOUSE,Operasional,10000000,Pembelian perlengkapan,Budi,Draft',filename:'template-pengajuan-budget.csv'},
   analisis_variance:{header:'tahun,bulan,department,category,budget,actual',example:'2026,Januari,WAREHOUSE,Operasional,55200000,18183659',filename:'template-analisis-variance.csv'},
