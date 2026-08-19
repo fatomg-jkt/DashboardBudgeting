@@ -40,10 +40,7 @@ export async function GET(req: Request) {
       })),
     );
 
-    // Laporan Per Detail Biaya bisa di-upload berkali-kali untuk periode/departemen
-    // yang sama. Tampilkan hanya versi paling baru untuk kombinasi
-    // Periode + Departemen + Deskripsi COA supaya tabel dan pie chart tidak double.
-    if (type === "budget_detail_biaya") {
+    if (type === "budget_detail_biaya" || type === "sisa_budget_detail_biaya") {
       const latest = new Map<string, Record<string, unknown>>();
       rows.forEach((row) => {
         const key = detailBiayaKey(row);
