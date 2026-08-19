@@ -20,7 +20,14 @@ import { detectHeaderRow, downloadTemplate } from "@/lib/import-utils";
 type Company = "1001" | "maison_y";
 type ReportMode = "monthly" | "ytd";
 type Sheet = { name: string; rows: string[][] };
-type ReportRow = { tahun: string; bulan: string; budget: number; actual: number };
+type ReportRow = {
+  tahun: string;
+  bulan: string;
+  budget: number;
+  actual: number;
+  selisihPercent?: number;
+  status?: string;
+};
 type ApiRow = Record<string, unknown>;
 
 const MONTHS = [
@@ -39,7 +46,7 @@ const MONTHS = [
 ];
 
 const nf = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
-const pf = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 1 });
+const pf = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 2 });
 
 function normalize(value: unknown) {
   return String(value ?? "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
@@ -85,32 +92,60 @@ function pick(row: ApiRow, keys: string[]) {
   return undefined;
 }
 
+function derivedSelisih(budget: number, actual: number) {
+  if (!budget) return actual > 0 ? 100 : 0;
+  return ((actual - budget) / budget) * 100;
+}
+
+function derivedStatus(budget: number, actual: number) {
+  if (actual > budget) return "Over Budget";
+  if (actual < budget) return "Under Budget";
+  return "On Budget";
+}
+
 function fromApiRow(row: ApiRow): ReportRow | null {
   const bulan = normalizeMonth(pick(row, ["bulan", "month"]));
   if (!bulan) return null;
+  const budget = numberValue(pick(row, ["budget", "anggaran", "total budget", "total_budget"]));
+  const actual = numberValue(pick(row, ["actual", "aktual", "realisasi", "total actual", "total_aktual"]));
+  const selisihRaw = pick(row, ["selisih %", "selisih_%", "selisih", "variance %", "variance_percent"]);
+  const statusRaw = String(pick(row, ["status", "status budget", "status_budget"]) ?? "").trim();
   return {
     tahun: String(pick(row, ["tahun", "year"]) ?? "").trim(),
     bulan,
-    budget: numberValue(pick(row, ["budget", "anggaran", "total budget", "total_budget"])),
-    actual: numberValue(pick(row, ["actual", "aktual", "realisasi", "total actual", "total_aktual"])),
+    budget,
+    actual,
+    selisihPercent: selisihRaw === undefined || String(selisihRaw).trim() === "" ? derivedSelisih(budget, actual) : numberValue(selisihRaw),
+    status: statusRaw || derivedStatus(budget, actual),
   };
 }
 
-function parseSheet(sheet: Sheet, headerRow: number): ReportRow[] {
+function parseSheet(sheet: Sheet, headerRow: number, mode: ReportMode): ReportRow[] {
   const headers = (sheet.rows[headerRow] ?? []).map((value) => String(value ?? "").trim());
   const normalized = headers.map(normalize);
   const yearIndex = normalized.findIndex((value) => ["tahun", "year"].includes(value));
   const monthIndex = normalized.findIndex((value) => ["bulan", "month"].includes(value));
   const budgetIndex = normalized.findIndex((value) => ["budget", "anggaran", "total_budget"].includes(value));
   const actualIndex = normalized.findIndex((value) => ["actual", "aktual", "realisasi", "total_actual", "total_aktual"].includes(value));
+  const selisihIndex = normalized.findIndex((value) => ["selisih", "selisih_percent", "selisih_persen", "variance_percent"].includes(value));
+  const statusIndex = normalized.findIndex((value) => ["status", "status_budget"].includes(value));
   if (monthIndex < 0 || budgetIndex < 0 || actualIndex < 0) return [];
 
-  return sheet.rows.slice(headerRow + 1).map((row) => ({
-    tahun: yearIndex >= 0 ? String(row[yearIndex] ?? "").trim() : "",
-    bulan: normalizeMonth(row[monthIndex]),
-    budget: numberValue(row[budgetIndex]),
-    actual: numberValue(row[actualIndex]),
-  })).filter((row) => row.bulan.length > 0);
+  return sheet.rows.slice(headerRow + 1).map((row) => {
+    const budget = numberValue(row[budgetIndex]);
+    const actual = numberValue(row[actualIndex]);
+    const uploadedStatus = statusIndex >= 0 ? String(row[statusIndex] ?? "").trim() : "";
+    return {
+      tahun: yearIndex >= 0 ? String(row[yearIndex] ?? "").trim() : "",
+      bulan: normalizeMonth(row[monthIndex]),
+      budget,
+      actual,
+      selisihPercent: mode === "monthly"
+        ? (selisihIndex >= 0 && String(row[selisihIndex] ?? "").trim() !== "" ? numberValue(row[selisihIndex]) : derivedSelisih(budget, actual))
+        : undefined,
+      status: mode === "monthly" ? (uploadedStatus || derivedStatus(budget, actual)) : undefined,
+    };
+  }).filter((row) => row.bulan.length > 0);
 }
 
 function formatAxis(value: number) {
@@ -130,7 +165,7 @@ function UploadModal({ company, mode, onClose, onSaved }: { company: Company; mo
   const [error, setError] = useState("");
 
   const selected = sheets[sheetIndex];
-  const rows = selected ? parseSheet(selected, headerRow) : [];
+  const rows = selected ? parseSheet(selected, headerRow, mode) : [];
   const reportType = mode === "monthly" ? "monthly_budget_actual" : "cumulative_budget_actual_ytd";
 
   async function choose(next?: File) {
@@ -167,7 +202,7 @@ function UploadModal({ company, mode, onClose, onSaved }: { company: Company; mo
           reportType,
           fileName: file.name,
           sheetName: selected.name,
-          headers: ["tahun", "bulan", "budget", "actual"],
+          headers: mode === "monthly" ? ["tahun", "bulan", "budget", "actual", "selisih_percent", "status"] : ["tahun", "bulan", "budget", "actual"],
           rows,
           strategy,
         }),
@@ -189,7 +224,7 @@ function UploadModal({ company, mode, onClose, onSaved }: { company: Company; mo
 
   return (
     <div className="fixed inset-0 z-[100] overflow-y-auto bg-black/80 p-4 md:p-10">
-      <div className="mx-auto max-w-5xl rounded-2xl border border-gold-500/20 bg-zinc-950 p-5">
+      <div className="mx-auto max-w-6xl rounded-2xl border border-gold-500/20 bg-zinc-950 p-5">
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">Upload / Import Excel</h2>
@@ -229,8 +264,16 @@ function UploadModal({ company, mode, onClose, onSaved }: { company: Company; mo
 
             <div className="overflow-x-auto rounded-xl border border-zinc-800">
               <table className="w-full text-sm">
-                <thead className="bg-blue-900 text-white"><tr><th className="px-3 py-2 text-left">Tahun</th><th className="px-3 py-2 text-left">Bulan</th><th className="px-3 py-2 text-right">Budget</th><th className="px-3 py-2 text-right">Actual</th></tr></thead>
-                <tbody>{rows.slice(0, 12).map((row, index) => <tr className="border-b border-zinc-800" key={`${row.bulan}-${index}`}><td className="px-3 py-2">{row.tahun}</td><td className="px-3 py-2">{row.bulan}</td><td className="px-3 py-2 text-right">{nf.format(row.budget)}</td><td className="px-3 py-2 text-right">{nf.format(row.actual)}</td></tr>)}</tbody>
+                <thead className="bg-blue-900 text-white">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Tahun</th>
+                    <th className="px-3 py-2 text-left">Bulan</th>
+                    <th className="px-3 py-2 text-right">Budget</th>
+                    <th className="px-3 py-2 text-right">Actual</th>
+                    {mode === "monthly" && <><th className="px-3 py-2 text-right">Selisih %</th><th className="px-3 py-2 text-left">Status</th></>}
+                  </tr>
+                </thead>
+                <tbody>{rows.slice(0, 12).map((row, index) => <tr className="border-b border-zinc-800" key={`${row.bulan}-${index}`}><td className="px-3 py-2">{row.tahun}</td><td className="px-3 py-2">{row.bulan}</td><td className="px-3 py-2 text-right">{nf.format(row.budget)}</td><td className="px-3 py-2 text-right">{nf.format(row.actual)}</td>{mode === "monthly" && <><td className="px-3 py-2 text-right">{pf.format(row.selisihPercent ?? 0)}%</td><td className="px-3 py-2">{row.status}</td></>}</tr>)}</tbody>
               </table>
             </div>
 
@@ -384,8 +427,17 @@ export default function MonthlyYtdBudgetReport() {
           <section className="overflow-hidden rounded-2xl border border-gold-500/20 bg-zinc-950/80">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-blue-900 text-white"><tr><th className="px-4 py-3 text-left">Tahun</th><th className="px-4 py-3 text-left">Bulan</th><th className="px-4 py-3 text-right">Budget</th><th className="px-4 py-3 text-right">Actual</th>{mode === "ytd" && <><th className="px-4 py-3 text-right">Budget YTD</th><th className="px-4 py-3 text-right">Actual YTD</th></>}</tr></thead>
-                <tbody>{chartData.map((row, index) => <tr key={`${row.bulan}-${index}`} className="border-b border-zinc-800"><td className="px-4 py-3">{row.tahun}</td><td className="px-4 py-3">{row.bulan}</td><td className="px-4 py-3 text-right">{nf.format(row.budget)}</td><td className="px-4 py-3 text-right">{nf.format(row.actual)}</td>{mode === "ytd" && <><td className="px-4 py-3 text-right">{nf.format(Number((row as ReportRow & { budgetYtd?: number }).budgetYtd ?? 0))}</td><td className="px-4 py-3 text-right">{nf.format(Number((row as ReportRow & { actualYtd?: number }).actualYtd ?? 0))}</td></>}</tr>)}</tbody>
+                <thead className="bg-blue-900 text-white">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Tahun</th>
+                    <th className="px-4 py-3 text-left">Bulan</th>
+                    <th className="px-4 py-3 text-right">Budget</th>
+                    <th className="px-4 py-3 text-right">Actual</th>
+                    {mode === "monthly" && <><th className="px-4 py-3 text-right">Selisih %</th><th className="px-4 py-3 text-left">Status</th></>}
+                    {mode === "ytd" && <><th className="px-4 py-3 text-right">Budget YTD</th><th className="px-4 py-3 text-right">Actual YTD</th></>}
+                  </tr>
+                </thead>
+                <tbody>{chartData.map((row, index) => <tr key={`${row.bulan}-${index}`} className="border-b border-zinc-800"><td className="px-4 py-3">{row.tahun}</td><td className="px-4 py-3">{row.bulan}</td><td className="px-4 py-3 text-right">{nf.format(row.budget)}</td><td className="px-4 py-3 text-right">{nf.format(row.actual)}</td>{mode === "monthly" && <><td className="px-4 py-3 text-right">{pf.format(row.selisihPercent ?? derivedSelisih(row.budget, row.actual))}%</td><td className="px-4 py-3">{row.status ?? derivedStatus(row.budget, row.actual)}</td></>}{mode === "ytd" && <><td className="px-4 py-3 text-right">{nf.format(Number((row as ReportRow & { budgetYtd?: number }).budgetYtd ?? 0))}</td><td className="px-4 py-3 text-right">{nf.format(Number((row as ReportRow & { actualYtd?: number }).actualYtd ?? 0))}</td></>}</tr>)}</tbody>
               </table>
             </div>
           </section>
