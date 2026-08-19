@@ -8,6 +8,8 @@ import DetailBiayaEnhancer from '@/components/detail-biaya-enhancer';
 import DetailBiayaPieChart from '@/components/detail-biaya-pie-chart';
 import SisaBudgetDetailEnhancer from '@/components/sisa-budget-detail-enhancer';
 import SisaBudgetDepartmentChart from '@/components/sisa-budget-department-chart';
+import BudgetVsActualExtraMenu from '@/components/budget-vs-actual-extra-menu';
+import MonthlyYtdBudgetReport from '@/components/monthly-ytd-budget-report';
 import './globals.css';
 import './branding-fix.css';
 
@@ -35,6 +37,7 @@ export default function RootLayout({
     <html lang="id" className={`${playfairDisplay.variable} ${publicSans.variable}`}>
       <body style={{ fontFamily: 'var(--font-body), sans-serif' }}>
         <MenuAdjuster />
+        <BudgetVsActualExtraMenu />
         <MonitoringMenuHider />
         <AnalisaBudgetEnhancer />
         <AnalisaBudgetRouteSync />
@@ -42,6 +45,7 @@ export default function RootLayout({
         <DetailBiayaPieChart />
         <SisaBudgetDetailEnhancer />
         <SisaBudgetDepartmentChart />
+        <MonthlyYtdBudgetReport />
         {children}
         <style>{`
           h1, h2, h3 {
