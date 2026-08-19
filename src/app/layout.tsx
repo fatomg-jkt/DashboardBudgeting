@@ -11,6 +11,7 @@ import SisaBudgetDepartmentChart from '@/components/sisa-budget-department-chart
 import BudgetVsActualExtraMenu from '@/components/budget-vs-actual-extra-menu';
 import MonthlyYtdBudgetReport from '@/components/monthly-ytd-budget-report';
 import YtdDetailReportEnhancer from '@/components/ytd-detail-report-enhancer';
+import YtdManagementSummary from '@/components/ytd-management-summary';
 import './globals.css';
 import './branding-fix.css';
 
@@ -48,6 +49,7 @@ export default function RootLayout({
         <SisaBudgetDepartmentChart />
         <MonthlyYtdBudgetReport />
         <YtdDetailReportEnhancer />
+        <YtdManagementSummary />
         {children}
         <style>{`
           h1, h2, h3 {
