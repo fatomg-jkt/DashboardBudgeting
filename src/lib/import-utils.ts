@@ -1,6 +1,6 @@
 import type { ReportType } from '@/lib/reports';
 
-const headerKeywords = new Set(['no','department','departemen','dept','budget','anggaran','actual','aktual','realisasi','variance','var','kategori','category','bulan','month','tahun','year','nominal','pic','status','deskripsi','coa','description','periode','total','sisa']);
+const headerKeywords = new Set(['no','department','departemen','dept','budget','anggaran','actual','aktual','realisasi','variance','var','kategori','category','bulan','month','tahun','year','nominal','pic','status','deskripsi','coa','description','periode','total','sisa','selisih']);
 export const headerToken = (value: unknown) => String(value ?? '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
 export function detectHeaderRow(rows: string[][]) {
@@ -21,7 +21,7 @@ const detailExample = 'Januari,Beban Amortisasi Asuransi,4200000,8344373,0,0,0,0
 export const templates: Record<ReportType, { header: string; example: string; filename: string }> = {
   budget_planning:{header:'tahun,bulan,department,category,budget,keterangan',example:'2026,Januari,WAREHOUSE,Operasional,55200000,Rencana tahunan',filename:'template-budget-planning.csv'},
   budget_vs_actual:{header:'tahun,bulan,department,category,budget,actual',example:'2026,Januari,WAREHOUSE,Operasional,55200000,18183659',filename:'template-budget-vs-actual.csv'},
-  monthly_budget_actual:{header:'Tahun,Bulan,Budget,Actual',example:'2026,Januari,500000000,420000000',filename:'template-monthly-budget-vs-actual.csv'},
+  monthly_budget_actual:{header:'Tahun,Bulan,Budget,Actual,Selisih %,Status',example:'2026,April,1267433332,1651087912,30.27%,Over Budget',filename:'template-monthly-budget-vs-actual.csv'},
   cumulative_budget_actual_ytd:{header:'Tahun,Bulan,Budget,Actual',example:'2026,Januari,500000000,420000000',filename:'template-cumulative-budget-vs-actual-ytd.csv'},
   realisasi_budget:{header:'tahun,bulan,department,category,actual,keterangan',example:'2026,Januari,WAREHOUSE,Operasional,18183659,Realisasi Januari',filename:'template-realisasi-budget.csv'},
   monitoring_budget:{header:'tahun,bulan,department,budget,actual,status',example:'2026,Januari,WAREHOUSE,55200000,18183659,Aman',filename:'template-monitoring-budget.csv'},
