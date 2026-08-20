@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -22,6 +23,11 @@ import {
 type Company = "1001" | "maison_y";
 type ApiRow = Record<string, unknown>;
 type ReportMap = Record<string, ApiRow[]>;
+type DepartmentStatus = {
+  department: string;
+  over: number;
+  under: number;
+};
 
 const MONTHS = [
   "Januari",
@@ -36,6 +42,19 @@ const MONTHS = [
   "Oktober",
   "November",
   "Desember",
+];
+
+const DEPARTMENT_ORDER = [
+  "DEVELOPMENT",
+  "FAT",
+  "HRD",
+  "MANAGEMENT KIKI",
+  "MANAGEMENT UMA",
+  "MARKETING",
+  "MERCHANDISE",
+  "OPERASIONAL",
+  "PURCHASING",
+  "WAREHOUSE",
 ];
 
 const REPORT_TYPES = [
@@ -92,18 +111,29 @@ function num(value: unknown) {
 function monthName(value: unknown) {
   const raw = String(value ?? "").trim().toLowerCase();
   const aliases: Record<string, string> = {
-    jan: "Januari", januari: "Januari",
-    feb: "Februari", februari: "Februari",
-    mar: "Maret", maret: "Maret",
-    apr: "April", april: "April",
+    jan: "Januari",
+    januari: "Januari",
+    feb: "Februari",
+    februari: "Februari",
+    mar: "Maret",
+    maret: "Maret",
+    apr: "April",
+    april: "April",
     mei: "Mei",
-    jun: "Juni", juni: "Juni",
-    jul: "Juli", juli: "Juli",
-    agu: "Agustus", agustus: "Agustus",
-    sep: "September", september: "September",
-    okt: "Oktober", oktober: "Oktober",
-    nov: "November", november: "November",
-    des: "Desember", desember: "Desember",
+    jun: "Juni",
+    juni: "Juni",
+    jul: "Juli",
+    juli: "Juli",
+    agu: "Agustus",
+    agustus: "Agustus",
+    sep: "September",
+    september: "September",
+    okt: "Oktober",
+    oktober: "Oktober",
+    nov: "November",
+    november: "November",
+    des: "Desember",
+    desember: "Desember",
   };
   if (aliases[raw]) return aliases[raw];
   for (const [key, label] of Object.entries(aliases)) {
@@ -113,30 +143,45 @@ function monthName(value: unknown) {
 }
 
 function budgetOf(row: ApiRow) {
-  return num(pick(row, [
-    "budget",
-    "anggaran",
-    "total_budget",
-    "beban_operasional_anggaran",
-    "budget_bulanan",
-  ]));
+  return num(
+    pick(row, [
+      "budget",
+      "anggaran",
+      "total_budget",
+      "total budget",
+      "beban_operasional_anggaran",
+      "budget_bulanan",
+    ]),
+  );
 }
 
 function actualOf(row: ApiRow) {
-  return num(pick(row, [
-    "actual",
-    "aktual",
-    "realisasi",
-    "total_actual",
-    "total_aktual",
-    "total_realisasi",
-    "beban_operasional_aktual",
-    "realisasi_bulanan",
-  ]));
+  return num(
+    pick(row, [
+      "actual",
+      "aktual",
+      "realisasi",
+      "total_actual",
+      "total actual",
+      "total_aktual",
+      "total aktual",
+      "total_realisasi",
+      "beban_operasional_aktual",
+      "realisasi_bulanan",
+    ]),
+  );
 }
 
 function departmentOf(row: ApiRow) {
-  return String(pick(row, ["department", "departemen", "dept"]) ?? "")
+  return String(
+    pick(row, [
+      "department",
+      "departemen",
+      "dept",
+      "nama_department",
+      "nama_departemen",
+    ]) ?? "",
+  )
     .trim()
     .toUpperCase();
 }
@@ -153,11 +198,18 @@ function axis(value: number) {
 }
 
 function aggregateByDepartment(rows: ApiRow[]) {
-  const map = new Map<string, { department: string; budget: number; actual: number }>();
+  const map = new Map<
+    string,
+    { department: string; budget: number; actual: number }
+  >();
   rows.forEach((row) => {
     const department = departmentOf(row);
     if (!department) return;
-    const current = map.get(department) ?? { department, budget: 0, actual: 0 };
+    const current = map.get(department) ?? {
+      department,
+      budget: 0,
+      actual: 0,
+    };
     current.budget += budgetOf(row);
     current.actual += actualOf(row);
     map.set(department, current);
@@ -170,7 +222,10 @@ function aggregateByDepartment(rows: ApiRow[]) {
 }
 
 function aggregateMonthly(rows: ApiRow[]) {
-  const map = new Map<string, { month: string; budget: number; actual: number }>();
+  const map = new Map<
+    string,
+    { month: string; budget: number; actual: number }
+  >();
   rows.forEach((row) => {
     const month = monthOf(row);
     if (!MONTHS.includes(month)) return;
@@ -179,7 +234,9 @@ function aggregateMonthly(rows: ApiRow[]) {
     current.actual += actualOf(row);
     map.set(month, current);
   });
-  return MONTHS.map((month) => map.get(month) ?? { month, budget: 0, actual: 0 });
+  return MONTHS.map(
+    (month) => map.get(month) ?? { month, budget: 0, actual: 0 },
+  );
 }
 
 function cumulativeMonthly(rows: ApiRow[]) {
@@ -196,7 +253,9 @@ function statusSummary(rows: ApiRow[]) {
   let over = 0;
   let under = 0;
   rows.forEach((row) => {
-    const status = String(pick(row, ["status_budget", "status"]) ?? "").toLowerCase();
+    const status = String(
+      pick(row, ["status_budget", "status budget", "status"]) ?? "",
+    ).toLowerCase();
     const budget = budgetOf(row);
     const actual = actualOf(row);
     if (status.includes("over") || actual > budget) over += 1;
@@ -206,6 +265,40 @@ function statusSummary(rows: ApiRow[]) {
     { name: "Over Budget", value: over },
     { name: "Under Budget", value: under },
   ].filter((item) => item.value > 0);
+}
+
+function statusByDepartment(rows: ApiRow[]) {
+  const grouped = new Map<string, DepartmentStatus>();
+
+  rows.forEach((row) => {
+    const department = departmentOf(row);
+    if (!department) return;
+
+    const current = grouped.get(department) ?? {
+      department,
+      over: 0,
+      under: 0,
+    };
+    const status = String(
+      pick(row, ["status_budget", "status budget", "status"]) ?? "",
+    ).toLowerCase();
+    const isOver = status.includes("over") || (!status.includes("under") && actualOf(row) > budgetOf(row));
+
+    if (isOver) current.over += 1;
+    else current.under += 1;
+    grouped.set(department, current);
+  });
+
+  return Array.from(grouped.values()).sort((a, b) => {
+    const aIndex = DEPARTMENT_ORDER.indexOf(a.department);
+    const bIndex = DEPARTMENT_ORDER.indexOf(b.department);
+    if (aIndex === -1 && bIndex === -1) {
+      return a.department.localeCompare(b.department);
+    }
+    if (aIndex === -1) return 1;
+    if (bIndex === -1) return -1;
+    return aIndex - bIndex;
+  });
 }
 
 function ChartCard({
@@ -226,7 +319,9 @@ function ChartCard({
           <h2 className="text-lg font-semibold">{title}</h2>
           <p className="mt-1 text-sm text-zinc-400">{subtitle}</p>
         </div>
-        <a className="secondary-button text-xs" href={href}>Buka Laporan</a>
+        <Link className="secondary-button text-xs" href={href}>
+          Buka Laporan
+        </Link>
       </div>
       {children}
     </section>
@@ -251,15 +346,19 @@ export default function DashboardGraphCenter() {
   const active = pathname === "/" || pathname === "/dashboard";
 
   const syncCompany = useCallback(() => {
-    const next: Company = localStorage.getItem("budgeting_active_company") === "maison_y"
-      ? "maison_y"
-      : "1001";
-    setCompany((current) => current === next ? current : next);
+    const next: Company =
+      localStorage.getItem("budgeting_active_company") === "maison_y"
+        ? "maison_y"
+        : "1001";
+    setCompany((current) => (current === next ? current : next));
   }, []);
 
   useEffect(() => {
     if (!active) {
-      document.querySelector("main")?.children.item(1)?.classList.remove("dashboard-graph-center-host");
+      document
+        .querySelector("main")
+        ?.children.item(1)
+        ?.classList.remove("dashboard-graph-center-host");
       setHost(null);
       return;
     }
@@ -269,7 +368,9 @@ export default function DashboardGraphCenter() {
     if (!content) return;
 
     content.classList.add("dashboard-graph-center-host");
-    let mount = content.querySelector<HTMLElement>("[data-dashboard-graph-center-mount]");
+    let mount = content.querySelector<HTMLElement>(
+      "[data-dashboard-graph-center-mount]",
+    );
     if (!mount) {
       mount = document.createElement("div");
       mount.dataset.dashboardGraphCenterMount = "true";
@@ -299,7 +400,10 @@ export default function DashboardGraphCenter() {
             { cache: "no-store" },
           );
           const payload: unknown = await response.json();
-          return [reportType, response.ok && Array.isArray(payload) ? payload as ApiRow[] : []] as const;
+          return [
+            reportType,
+            response.ok && Array.isArray(payload) ? (payload as ApiRow[]) : [],
+          ] as const;
         } catch {
           return [reportType, []] as const;
         }
@@ -311,7 +415,9 @@ export default function DashboardGraphCenter() {
       }
     });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [active, company]);
 
   const budgetDepartment = useMemo(
@@ -338,13 +444,19 @@ export default function DashboardGraphCenter() {
       if (!MONTHS.includes(month)) return;
       map.set(month, (map.get(month) ?? 0) + actualOf(row));
     });
-    return MONTHS.map((month) => ({ month, actual: map.get(month) ?? 0 }));
+    return MONTHS.map((month) => ({
+      month,
+      actual: map.get(month) ?? 0,
+    }));
   }, [reports]);
   const realisasiDepartment = useMemo(
-    () => aggregateByDepartment(reports.realisasi_per_departemen ?? []).map((row) => ({
-      department: row.department,
-      actual: row.actual,
-    })),
+    () =>
+      aggregateByDepartment(reports.realisasi_per_departemen ?? []).map(
+        (row) => ({
+          department: row.department,
+          actual: row.actual,
+        }),
+      ),
     [reports],
   );
   const analysisDepartment = useMemo(() => {
@@ -355,15 +467,21 @@ export default function DashboardGraphCenter() {
     () => statusSummary(reports.budget_detail_biaya ?? []),
     [reports],
   );
-  const sisaDetailStatus = useMemo(
-    () => statusSummary(reports.sisa_budget_detail_biaya ?? []),
-    [reports],
-  );
+  const sisaDetailDepartments = useMemo(() => {
+    const primary = statusByDepartment(reports.sisa_budget_detail_biaya ?? []);
+    if (primary.length) return primary;
+    return statusByDepartment(reports.budget_detail_biaya ?? []);
+  }, [reports]);
 
   const totals = useMemo(() => {
     const budget = budgetDepartment.reduce((sum, row) => sum + row.budget, 0);
     const actual = budgetDepartment.reduce((sum, row) => sum + row.actual, 0);
-    return { budget, actual, variance: actual - budget, sisa: budget - actual };
+    return {
+      budget,
+      actual,
+      variance: actual - budget,
+      sisa: budget - actual,
+    };
   }, [budgetDepartment]);
 
   if (!active || !host) return null;
@@ -377,7 +495,8 @@ export default function DashboardGraphCenter() {
       <div>
         <h2 className="text-2xl font-semibold">Pusat Grafik Budgeting</h2>
         <p className="mt-1 text-sm text-zinc-400">
-          Ringkasan grafik seluruh laporan dan submenu untuk perusahaan {company === "1001" ? "1001" : "Maison Y"}.
+          Ringkasan grafik seluruh laporan dan submenu untuk perusahaan{" "}
+          {company === "1001" ? "1001" : "Maison Y"}.
         </p>
       </div>
 
@@ -388,52 +507,365 @@ export default function DashboardGraphCenter() {
           ["Variance", totals.variance],
           ["Sisa Budget", totals.sisa],
         ].map(([label, value]) => (
-          <div key={String(label)} className="rounded-2xl border border-gold-500/20 bg-zinc-950/80 p-5">
+          <div
+            key={String(label)}
+            className="rounded-2xl border border-gold-500/20 bg-zinc-950/80 p-5"
+          >
             <p className="text-sm text-zinc-400">{label}</p>
-            <p className="mt-2 text-2xl font-semibold">{rupiah.format(Number(value))}</p>
+            <p className="mt-2 text-2xl font-semibold">
+              {rupiah.format(Number(value))}
+            </p>
           </div>
         ))}
       </div>
 
       {loading ? (
-        <div className="rounded-2xl border border-gold-500/20 p-10 text-center text-zinc-400">Memuat seluruh grafik...</div>
+        <div className="rounded-2xl border border-gold-500/20 p-10 text-center text-zinc-400">
+          Memuat seluruh grafik...
+        </div>
       ) : (
         <div className="grid gap-6 xl:grid-cols-2">
-          <ChartCard title="Budget vs Actual - Per Departemen" subtitle="Perbandingan budget dan actual setiap departemen" href="/budget-vs-actual?view=per-departemen">
-            {budgetDepartment.length ? <div className="h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={budgetDepartment}><CartesianGrid stroke="#27272a"/><XAxis dataKey="department" interval={0} angle={-15} textAnchor="end" height={70}/><YAxis tickFormatter={axis}/><Tooltip formatter={tooltip}/><Legend/><Bar dataKey="budget" name="Budget" fill="#2563EB"/><Bar dataKey="actual" name="Actual" fill="#EF4444"/></BarChart></ResponsiveContainer></div> : <EmptyChart/>}
+          <ChartCard
+            title="Budget vs Actual - Per Departemen"
+            subtitle="Perbandingan budget dan actual setiap departemen"
+            href="/budget-vs-actual?view=per-departemen"
+          >
+            {budgetDepartment.length ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={budgetDepartment}>
+                    <CartesianGrid stroke="#27272a" />
+                    <XAxis
+                      dataKey="department"
+                      interval={0}
+                      angle={-15}
+                      textAnchor="end"
+                      height={70}
+                    />
+                    <YAxis tickFormatter={axis} />
+                    <Tooltip formatter={tooltip} />
+                    <Legend />
+                    <Bar dataKey="budget" name="Budget" fill="#2563EB" />
+                    <Bar dataKey="actual" name="Actual" fill="#EF4444" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyChart />
+            )}
           </ChartCard>
 
-          <ChartCard title="Monthly Budget vs Actual" subtitle="Budget dan actual per bulan" href="/budget-vs-actual?view=monthly">
-            {monthly.some((row) => row.budget || row.actual) ? <div className="h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthly}><CartesianGrid stroke="#27272a"/><XAxis dataKey="month"/><YAxis tickFormatter={axis}/><Tooltip formatter={tooltip}/><Legend/><Bar dataKey="budget" name="Budget" fill="#2563EB"/><Bar dataKey="actual" name="Actual" fill="#EF4444"/></BarChart></ResponsiveContainer></div> : <EmptyChart/>}
+          <ChartCard
+            title="Monthly Budget vs Actual"
+            subtitle="Budget dan actual per bulan"
+            href="/budget-vs-actual?view=monthly"
+          >
+            {monthly.some((row) => row.budget || row.actual) ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthly}>
+                    <CartesianGrid stroke="#27272a" />
+                    <XAxis dataKey="month" />
+                    <YAxis tickFormatter={axis} />
+                    <Tooltip formatter={tooltip} />
+                    <Legend />
+                    <Bar dataKey="budget" name="Budget" fill="#2563EB" />
+                    <Bar dataKey="actual" name="Actual" fill="#EF4444" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyChart />
+            )}
           </ChartCard>
 
-          <ChartCard title="Cumulative Budget vs Actual YTD" subtitle="Akumulasi budget dan actual dari awal tahun" href="/budget-vs-actual?view=ytd">
-            {ytd.some((row) => row.budgetYtd || row.actualYtd) ? <div className="h-80"><ResponsiveContainer width="100%" height="100%"><LineChart data={ytd}><CartesianGrid stroke="#27272a"/><XAxis dataKey="month"/><YAxis tickFormatter={axis}/><Tooltip formatter={tooltip}/><Legend/><Line type="monotone" dataKey="budgetYtd" name="Budget YTD" stroke="#2563EB" strokeWidth={3}/><Line type="monotone" dataKey="actualYtd" name="Actual YTD" stroke="#EF4444" strokeWidth={3}/></LineChart></ResponsiveContainer></div> : <EmptyChart/>}
+          <ChartCard
+            title="Cumulative Budget vs Actual YTD"
+            subtitle="Akumulasi budget dan actual dari awal tahun"
+            href="/budget-vs-actual?view=ytd"
+          >
+            {ytd.some((row) => row.budgetYtd || row.actualYtd) ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={ytd}>
+                    <CartesianGrid stroke="#27272a" />
+                    <XAxis dataKey="month" />
+                    <YAxis tickFormatter={axis} />
+                    <Tooltip formatter={tooltip} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="budgetYtd"
+                      name="Budget YTD"
+                      stroke="#2563EB"
+                      strokeWidth={3}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="actualYtd"
+                      name="Actual YTD"
+                      stroke="#EF4444"
+                      strokeWidth={3}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyChart />
+            )}
           </ChartCard>
 
-          <ChartCard title="Sisa Budget - Per Departemen" subtitle="Sisa budget setiap departemen" href="/laporan-budget?view=sisa-budget-per-departemen">
-            {sisaDepartment.length ? <div className="h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={sisaDepartment}><CartesianGrid stroke="#27272a"/><XAxis dataKey="department" interval={0} angle={-15} textAnchor="end" height={70}/><YAxis tickFormatter={axis}/><Tooltip formatter={tooltip}/><Legend/><Bar dataKey="sisa" name="Sisa Budget" fill="#2A9D8F"/></BarChart></ResponsiveContainer></div> : <EmptyChart/>}
+          <ChartCard
+            title="Sisa Budget - Per Departemen"
+            subtitle="Sisa budget setiap departemen"
+            href="/laporan-budget?view=sisa-budget-per-departemen"
+          >
+            {sisaDepartment.length ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={sisaDepartment}>
+                    <CartesianGrid stroke="#27272a" />
+                    <XAxis
+                      dataKey="department"
+                      interval={0}
+                      angle={-15}
+                      textAnchor="end"
+                      height={70}
+                    />
+                    <YAxis tickFormatter={axis} />
+                    <Tooltip formatter={tooltip} />
+                    <Legend />
+                    <Bar
+                      dataKey="sisa"
+                      name="Sisa Budget"
+                      fill="#2A9D8F"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyChart />
+            )}
           </ChartCard>
 
-          <ChartCard title="Realisasi Bulanan" subtitle="Trend realisasi budget per bulan" href="/realisasi-budget?view=bulanan">
-            {realisasiMonthly.some((row) => row.actual) ? <div className="h-80"><ResponsiveContainer width="100%" height="100%"><LineChart data={realisasiMonthly}><CartesianGrid stroke="#27272a"/><XAxis dataKey="month"/><YAxis tickFormatter={axis}/><Tooltip formatter={tooltip}/><Legend/><Line type="monotone" dataKey="actual" name="Realisasi" stroke="#EF4444" strokeWidth={3}/></LineChart></ResponsiveContainer></div> : <EmptyChart/>}
+          <ChartCard
+            title="Realisasi Bulanan"
+            subtitle="Trend realisasi budget per bulan"
+            href="/realisasi-budget?view=bulanan"
+          >
+            {realisasiMonthly.some((row) => row.actual) ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={realisasiMonthly}>
+                    <CartesianGrid stroke="#27272a" />
+                    <XAxis dataKey="month" />
+                    <YAxis tickFormatter={axis} />
+                    <Tooltip formatter={tooltip} />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="actual"
+                      name="Realisasi"
+                      stroke="#EF4444"
+                      strokeWidth={3}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyChart />
+            )}
           </ChartCard>
 
-          <ChartCard title="Realisasi - Per Departemen" subtitle="Realisasi budget antar departemen" href="/realisasi-budget?view=per-departemen">
-            {realisasiDepartment.length ? <div className="h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={realisasiDepartment}><CartesianGrid stroke="#27272a"/><XAxis dataKey="department" interval={0} angle={-15} textAnchor="end" height={70}/><YAxis tickFormatter={axis}/><Tooltip formatter={tooltip}/><Legend/><Bar dataKey="actual" name="Realisasi" fill="#2563EB"/></BarChart></ResponsiveContainer></div> : <EmptyChart/>}
+          <ChartCard
+            title="Realisasi - Per Departemen"
+            subtitle="Realisasi budget antar departemen"
+            href="/realisasi-budget?view=per-departemen"
+          >
+            {realisasiDepartment.length ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={realisasiDepartment}>
+                    <CartesianGrid stroke="#27272a" />
+                    <XAxis
+                      dataKey="department"
+                      interval={0}
+                      angle={-15}
+                      textAnchor="end"
+                      height={70}
+                    />
+                    <YAxis tickFormatter={axis} />
+                    <Tooltip formatter={tooltip} />
+                    <Legend />
+                    <Bar
+                      dataKey="actual"
+                      name="Realisasi"
+                      fill="#2563EB"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyChart />
+            )}
           </ChartCard>
 
-          <ChartCard title="Analisa Budget - Variance Departemen" subtitle="Nilai over/under budget setiap departemen" href="/analisis-variance">
-            {analysisDepartment.length ? <div className="h-80"><ResponsiveContainer width="100%" height="100%"><BarChart data={analysisDepartment}><CartesianGrid stroke="#27272a"/><XAxis dataKey="department" interval={0} angle={-15} textAnchor="end" height={70}/><YAxis tickFormatter={axis}/><Tooltip formatter={tooltip}/><Legend/><Bar dataKey="variance" name="Variance (Actual - Budget)" fill="#E9C46A"/></BarChart></ResponsiveContainer></div> : <EmptyChart/>}
+          <ChartCard
+            title="Analisa Budget - Variance Departemen"
+            subtitle="Nilai over/under budget setiap departemen"
+            href="/analisis-variance"
+          >
+            {analysisDepartment.length ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analysisDepartment}>
+                    <CartesianGrid stroke="#27272a" />
+                    <XAxis
+                      dataKey="department"
+                      interval={0}
+                      angle={-15}
+                      textAnchor="end"
+                      height={70}
+                    />
+                    <YAxis tickFormatter={axis} />
+                    <Tooltip formatter={tooltip} />
+                    <Legend />
+                    <Bar
+                      dataKey="variance"
+                      name="Variance (Actual - Budget)"
+                      fill="#E9C46A"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyChart />
+            )}
           </ChartCard>
 
-          <ChartCard title="Budget vs Actual - Status Detail Biaya" subtitle="Komposisi detail biaya Over Budget dan Under Budget" href="/budget-vs-actual?view=detail-biaya">
-            {detailStatus.length ? <div className="h-80"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={detailStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={105} label>{detailStatus.map((_, index) => <Cell key={index} fill={index === 0 ? "#EF4444" : "#2A9D8F"}/>)}</Pie><Tooltip/><Legend/></PieChart></ResponsiveContainer></div> : <EmptyChart/>}
+          <ChartCard
+            title="Budget vs Actual - Status Detail Biaya"
+            subtitle="Komposisi detail biaya Over Budget dan Under Budget"
+            href="/budget-vs-actual?view=detail-biaya"
+          >
+            {detailStatus.length ? (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={detailStatus}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={105}
+                      label
+                    >
+                      {detailStatus.map((_, index) => (
+                        <Cell
+                          key={index}
+                          fill={index === 0 ? "#EF4444" : "#2A9D8F"}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <EmptyChart />
+            )}
           </ChartCard>
 
-          <ChartCard title="Sisa Budget - Status Detail Biaya" subtitle="Komposisi status detail biaya pada laporan sisa budget" href="/laporan-budget?view=sisa-budget-detail-biaya">
-            {sisaDetailStatus.length ? <div className="h-80"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={sisaDetailStatus} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={105} label>{sisaDetailStatus.map((_, index) => <Cell key={index} fill={index === 0 ? "#EF4444" : "#2A9D8F"}/>)}</Pie><Tooltip/><Legend/></PieChart></ResponsiveContainer></div> : <EmptyChart/>}
-          </ChartCard>
+          <div className="xl:col-span-2">
+            <ChartCard
+              title="Sisa Budget - Per Detail Biaya"
+              subtitle="Pie chart kecil Over Budget dan Under Budget untuk semua departemen"
+              href="/laporan-budget?view=sisa-budget-detail-biaya"
+            >
+              {sisaDetailDepartments.length ? (
+                <>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10">
+                    {sisaDetailDepartments.map((item) => {
+                      const total = item.over + item.under;
+                      const pieData = [
+                        { name: "Over Budget", value: item.over },
+                        { name: "Under Budget", value: item.under },
+                      ].filter((entry) => entry.value > 0);
+                      const chartData = pieData.length
+                        ? pieData
+                        : [{ name: "Under Budget", value: 1 }];
+
+                      return (
+                        <div
+                          key={item.department}
+                          className="rounded-lg border border-zinc-800 bg-black/30 p-2 text-center"
+                        >
+                          <p className="min-h-8 text-[10px] font-semibold leading-tight text-zinc-200">
+                            {item.department}
+                          </p>
+                          <div className="mx-auto h-20 w-20">
+                            <ResponsiveContainer width="100%" height="100%">
+                              <PieChart>
+                                <Pie
+                                  data={chartData}
+                                  dataKey="value"
+                                  nameKey="name"
+                                  innerRadius={16}
+                                  outerRadius={34}
+                                  stroke="none"
+                                >
+                                  {chartData.map((entry) => (
+                                    <Cell
+                                      key={entry.name}
+                                      fill={
+                                        entry.name === "Over Budget"
+                                          ? "#EF4444"
+                                          : "#2A9D8F"
+                                      }
+                                    />
+                                  ))}
+                                </Pie>
+                                <Tooltip
+                                  formatter={(
+                                    value: number | string,
+                                    name: string,
+                                  ) => [`${Number(value)} item`, name]}
+                                />
+                              </PieChart>
+                            </ResponsiveContainer>
+                          </div>
+                          <p className="text-[10px] leading-tight text-red-400">
+                            Over {item.over}
+                          </p>
+                          <p className="text-[10px] leading-tight text-emerald-400">
+                            Under {item.under}
+                          </p>
+                          <p className="mt-0.5 text-[9px] text-zinc-500">
+                            Total {total} item
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs">
+                    <span className="inline-flex items-center gap-1 text-red-400">
+                      <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                      Over Budget
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-emerald-400">
+                      <span className="h-2.5 w-2.5 rounded-full bg-[#2A9D8F]" />
+                      Under Budget
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <EmptyChart />
+              )}
+            </ChartCard>
+          </div>
         </div>
       )}
     </div>,
