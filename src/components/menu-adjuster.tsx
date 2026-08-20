@@ -92,7 +92,6 @@ export default function MenuAdjuster() {
           link.tabIndex = -1;
         });
 
-      // Ubah label Analisis Variance menjadi Analisa Budget.
       document
         .querySelectorAll<HTMLAnchorElement>('a[href="/analisis-variance"]')
         .forEach((link) => setMenuLabel(link, "Analisa Budget"));
@@ -187,6 +186,7 @@ export default function MenuAdjuster() {
             makeInactive(sisaDept);
             sisa.insertAdjacentElement("afterend", sisaDept);
           }
+          replaceWithSisaBudgetIcon(sisaDept);
 
           let sisaDetail = parent.querySelector<HTMLAnchorElement>(
             'a[data-sisa-submenu="detail-biaya"]',
@@ -200,6 +200,7 @@ export default function MenuAdjuster() {
             makeInactive(sisaDetail);
             sisaDept.insertAdjacentElement("afterend", sisaDetail);
           }
+          replaceWithSisaBudgetIcon(sisaDetail);
 
           if (budgetDeptActive) makeActive(budgetDept);
           else makeInactive(budgetDept);
@@ -230,7 +231,6 @@ export default function MenuAdjuster() {
           bindHeadToggle(sisa, sisaSubmenus);
         });
 
-      // Tambahkan submenu collapsible khusus Analisa Budget.
       document
         .querySelectorAll<HTMLAnchorElement>('a[href="/analisis-variance"]')
         .forEach((analisaLink) => {
