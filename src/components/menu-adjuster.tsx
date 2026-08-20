@@ -96,6 +96,10 @@ export default function MenuAdjuster() {
         .querySelectorAll<HTMLAnchorElement>('a[href="/analisis-variance"]')
         .forEach((link) => setMenuLabel(link, "Analisa Budget"));
 
+      document
+        .querySelectorAll<HTMLAnchorElement>('a[href="/laporan-budget"]')
+        .forEach((link) => setMenuLabel(link, "Ringkasan Budget"));
+
       const params = new URLSearchParams(window.location.search);
       const budgetDeptActive =
         window.location.pathname === "/budget-vs-actual" &&
@@ -165,12 +169,14 @@ export default function MenuAdjuster() {
             sisa = budgetLink.cloneNode(true) as HTMLAnchorElement;
             sisa.href = "/laporan-budget?view=sisa-budget";
             sisa.dataset.menuSisaBudget = "true";
-            sisa.setAttribute("aria-label", "Laporan Sisa Budget");
-            setMenuLabel(sisa, "Laporan Sisa Budget");
+            sisa.setAttribute("aria-label", "Sisa Budget");
+            setMenuLabel(sisa, "Sisa Budget");
             replaceWithSisaBudgetIcon(sisa);
             makeInactive(sisa);
             budgetDetail.insertAdjacentElement("afterend", sisa);
           } else {
+            sisa.setAttribute("aria-label", "Sisa Budget");
+            setMenuLabel(sisa, "Sisa Budget");
             replaceWithSisaBudgetIcon(sisa);
           }
 
