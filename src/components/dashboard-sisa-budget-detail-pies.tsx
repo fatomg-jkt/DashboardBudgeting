@@ -9,10 +9,12 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 type Company = "1001" | "maison_y";
 type ApiRow = Record<string, unknown>;
 
-type DepartmentStatus = {
+type DepartmentSummary = {
   department: string;
-  over: number;
-  under: number;
+  budget: number;
+  actual: number;
+  remaining: number;
+  utilization: number;
 };
 
 const DEPARTMENT_ORDER = [
@@ -27,6 +29,8 @@ const DEPARTMENT_ORDER = [
   "PURCHASING",
   "WAREHOUSE",
 ];
+
+const nf = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
 
 function normalize(value: unknown) {
   return String(value ?? "")
@@ -78,42 +82,66 @@ function departmentOf(row: ApiRow) {
     .toUpperCase();
 }
 
-function isOverBudget(row: ApiRow) {
-  const status = String(
-    pick(row, ["status_budget", "status budget", "status", "budget_status"]) ?? "",
-  )
-    .trim()
-    .toLowerCase();
+function departmentAmount(row: ApiRow, department: string, kind: "budget" | "actual") {
+  const generic =
+    kind === "budget"
+      ? pick(row, [
+          "budget",
+          "anggaran",
+          "total_budget",
+          "total budget",
+          "beban_operasional_anggaran",
+          "budget_bulanan",
+        ])
+      : pick(row, [
+          "actual",
+          "aktual",
+          "realisasi",
+          "total_actual",
+          "total actual",
+          "total_aktual",
+          "total aktual",
+          "beban_operasional_aktual",
+          "realisasi_bulanan",
+        ]);
 
-  if (status.includes("over")) return true;
-  if (status.includes("under")) return false;
+  if (generic !== undefined) return numberValue(generic);
 
-  const budget = numberValue(
-    pick(row, [
-      "budget",
-      "anggaran",
-      "total_budget",
-      "total budget",
-      "beban_operasional_anggaran",
-    ]),
-  );
-  const actual = numberValue(
-    pick(row, [
-      "actual",
-      "aktual",
-      "realisasi",
-      "total_actual",
-      "total aktual",
-      "total_aktual",
-      "beban_operasional_aktual",
-    ]),
-  );
+  const deptKey = normalize(department);
+  const suffixes =
+    kind === "budget"
+      ? ["anggaran", "budget"]
+      : ["aktual", "actual", "realisasi"];
 
-  return actual > budget;
+  for (const [key, value] of Object.entries(row)) {
+    const normalizedKey = normalize(key);
+    const matchesDepartment =
+      normalizedKey.includes(deptKey) || deptKey.includes(normalizedKey.split("_")[0] ?? "");
+    const matchesKind = suffixes.some((suffix) => normalizedKey.includes(suffix));
+    if (matchesDepartment && matchesKind) return numberValue(value);
+  }
+
+  return 0;
 }
 
 function hasDepartmentRows(rows: ApiRow[]) {
   return rows.some((row) => Boolean(departmentOf(row)));
+}
+
+function shortMoney(value: number) {
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 1_000_000_000) {
+    return `${sign}Rp${(abs / 1_000_000_000).toLocaleString("id-ID", {
+      maximumFractionDigits: 1,
+    })} M`;
+  }
+  if (abs >= 1_000_000) {
+    return `${sign}Rp${(abs / 1_000_000).toLocaleString("id-ID", {
+      maximumFractionDigits: 1,
+    })} jt`;
+  }
+  return `${sign}Rp${nf.format(abs)}`;
 }
 
 function findOriginalSisaDetailSection() {
@@ -265,7 +293,10 @@ export default function DashboardSisaBudgetDetailPies() {
   }, [active, company]);
 
   const departments = useMemo(() => {
-    const grouped = new Map<string, DepartmentStatus>();
+    const grouped = new Map<
+      string,
+      { department: string; budget: number; actual: number }
+    >();
 
     rows.forEach((row) => {
       const department = departmentOf(row);
@@ -273,26 +304,35 @@ export default function DashboardSisaBudgetDetailPies() {
 
       const current = grouped.get(department) ?? {
         department,
-        over: 0,
-        under: 0,
+        budget: 0,
+        actual: 0,
       };
 
-      if (isOverBudget(row)) current.over += 1;
-      else current.under += 1;
-
+      current.budget += departmentAmount(row, department, "budget");
+      current.actual += departmentAmount(row, department, "actual");
       grouped.set(department, current);
     });
 
-    return Array.from(grouped.values()).sort((a, b) => {
-      const aIndex = DEPARTMENT_ORDER.indexOf(a.department);
-      const bIndex = DEPARTMENT_ORDER.indexOf(b.department);
-      if (aIndex === -1 && bIndex === -1) {
-        return a.department.localeCompare(b.department);
-      }
-      if (aIndex === -1) return 1;
-      if (bIndex === -1) return -1;
-      return aIndex - bIndex;
-    });
+    return Array.from(grouped.values())
+      .map<DepartmentSummary>((item) => {
+        const remaining = item.budget - item.actual;
+        const utilization = item.budget > 0 ? (item.actual / item.budget) * 100 : 0;
+        return {
+          ...item,
+          remaining,
+          utilization,
+        };
+      })
+      .sort((a, b) => {
+        const aIndex = DEPARTMENT_ORDER.indexOf(a.department);
+        const bIndex = DEPARTMENT_ORDER.indexOf(b.department);
+        if (aIndex === -1 && bIndex === -1) {
+          return a.department.localeCompare(b.department);
+        }
+        if (aIndex === -1) return 1;
+        if (bIndex === -1) return -1;
+        return aIndex - bIndex;
+      });
   }, [rows]);
 
   if (!active || !host) return null;
@@ -306,7 +346,7 @@ export default function DashboardSisaBudgetDetailPies() {
         <div>
           <h2 className="text-lg font-semibold">Sisa Budget - Per Detail Biaya</h2>
           <p className="mt-1 text-sm text-zinc-400">
-            Semua departemen dalam pie chart kecil: Over Budget vs Under Budget.
+            Ringkasan Budget, Actual, Sisa Budget, dan persentase terpakai untuk semua departemen.
           </p>
         </div>
         <Link
@@ -321,14 +361,13 @@ export default function DashboardSisaBudgetDetailPies() {
         <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10">
             {departments.map((item) => {
-              const total = item.over + item.under;
-              const data = [
-                { name: "Over Budget", value: item.over },
-                { name: "Under Budget", value: item.under },
+              const chartData = [
+                { name: "Actual", value: Math.max(item.actual, 0) },
+                { name: "Sisa", value: Math.max(item.remaining, 0) },
               ].filter((entry) => entry.value > 0);
-              const chartData = data.length
-                ? data
-                : [{ name: "Under Budget", value: 1 }];
+              const safeChartData = chartData.length
+                ? chartData
+                : [{ name: "Sisa", value: 1 }];
 
               return (
                 <div
@@ -338,46 +377,51 @@ export default function DashboardSisaBudgetDetailPies() {
                   <p className="min-h-8 text-[10px] font-semibold leading-tight text-zinc-200">
                     {item.department}
                   </p>
-                  <div className="mx-auto h-20 w-20">
+
+                  <div className="mx-auto h-16 w-16">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={chartData}
+                          data={safeChartData}
                           dataKey="value"
                           nameKey="name"
-                          innerRadius={16}
-                          outerRadius={34}
+                          innerRadius={13}
+                          outerRadius={28}
                           stroke="none"
                         >
-                          {chartData.map((entry) => (
+                          {safeChartData.map((entry) => (
                             <Cell
                               key={entry.name}
-                              fill={
-                                entry.name === "Over Budget"
-                                  ? "#EF4444"
-                                  : "#2A9D8F"
-                              }
+                              fill={entry.name === "Actual" ? "#EF4444" : "#2A9D8F"}
                             />
                           ))}
                         </Pie>
                         <Tooltip
                           formatter={(value: number | string, name: string) => [
-                            `${Number(value)} item`,
+                            `Rp ${nf.format(Number(value))}`,
                             name,
                           ]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  <p className="text-[10px] leading-tight text-red-400">
-                    Over {item.over}
-                  </p>
-                  <p className="text-[10px] leading-tight text-emerald-400">
-                    Under {item.under}
-                  </p>
-                  <p className="mt-0.5 text-[9px] text-zinc-500">
-                    Total {total} item
-                  </p>
+
+                  <div className="mt-1 space-y-0.5 text-[10px] leading-tight">
+                    <p className="text-zinc-300">
+                      Budget <span className="block font-semibold text-white">{shortMoney(item.budget)}</span>
+                    </p>
+                    <p className="text-red-400">
+                      Actual <span className="block font-semibold">{shortMoney(item.actual)}</span>
+                    </p>
+                    <p className={item.remaining < 0 ? "text-red-400" : "text-emerald-400"}>
+                      Sisa <span className="block font-semibold">{shortMoney(item.remaining)}</span>
+                    </p>
+                    <p className="pt-0.5 text-[9px] text-zinc-500">
+                      {item.utilization.toLocaleString("id-ID", {
+                        maximumFractionDigits: 1,
+                      })}% terpakai
+                    </p>
+                  </div>
                 </div>
               );
             })}
@@ -386,11 +430,11 @@ export default function DashboardSisaBudgetDetailPies() {
           <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs">
             <span className="inline-flex items-center gap-1 text-red-400">
               <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-              Over Budget
+              Actual
             </span>
             <span className="inline-flex items-center gap-1 text-emerald-400">
               <span className="h-2.5 w-2.5 rounded-full bg-[#2A9D8F]" />
-              Under Budget
+              Sisa Budget
             </span>
           </div>
         </>
