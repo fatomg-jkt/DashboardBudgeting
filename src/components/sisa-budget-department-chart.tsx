@@ -9,6 +9,20 @@ type ApiRow = Record<string, unknown>;
 type Point = { department: string; budget: number; actual: number; remaining: number };
 
 const nf = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
+const MONTHS = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
 
 function num(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -39,6 +53,33 @@ function value(row: ApiRow, keys: string[]) {
   return undefined;
 }
 
+function monthName(input: unknown) {
+  const raw = String(input ?? "").trim().toLowerCase();
+  const aliases: Record<string, string> = {
+    jan: "Januari", januari: "Januari",
+    feb: "Februari", februari: "Februari",
+    mar: "Maret", maret: "Maret",
+    apr: "April", april: "April",
+    mei: "Mei",
+    jun: "Juni", juni: "Juni",
+    jul: "Juli", juli: "Juli",
+    agu: "Agustus", agustus: "Agustus",
+    sep: "September", september: "September",
+    okt: "Oktober", oktober: "Oktober",
+    nov: "November", november: "November",
+    des: "Desember", desember: "Desember",
+  };
+  if (aliases[raw]) return aliases[raw];
+  for (const [alias, label] of Object.entries(aliases)) {
+    if (raw.includes(alias)) return label;
+  }
+  return String(input ?? "").trim();
+}
+
+function rowMonth(row: ApiRow) {
+  return monthName(value(row, ["bulan", "month", "periode"]));
+}
+
 function axis(value: number) {
   const abs = Math.abs(value);
   if (abs >= 1_000_000_000) return `${nf.format(value / 1_000_000_000)} M`;
@@ -46,10 +87,15 @@ function axis(value: number) {
   return nf.format(value);
 }
 
+function periodStorageKey(company: Company) {
+  return `budgeting_sisa_budget_period_${company}`;
+}
+
 export default function SisaBudgetDepartmentChart() {
   const [host, setHost] = useState<HTMLElement | null>(null);
   const [company, setCompany] = useState<Company>("1001");
   const [rows, setRows] = useState<ApiRow[]>([]);
+  const [selectedPeriod, setSelectedPeriod] = useState("");
 
   const active =
     typeof window !== "undefined" &&
@@ -89,7 +135,6 @@ export default function SisaBudgetDepartmentChart() {
     }
     setHost(mount);
 
-    // Halaman ini adalah submenu Laporan Sisa Budget, bukan Laporan Budget umum.
     const pageTitle = main?.querySelector("header h1");
     const previousPageTitle = pageTitle?.textContent ?? "";
     if (pageTitle) pageTitle.textContent = "Laporan Sisa Budget";
@@ -116,14 +161,9 @@ export default function SisaBudgetDepartmentChart() {
     if (!active) return;
 
     void loadRows();
-
-    // Import Excel terjadi di modal DashboardApp. Parent table dapat langsung berubah,
-    // tetapi komponen grafik berdiri sendiri. Refresh ringan ini membuat grafik
-    // otomatis ikut membaca data terbaru tanpa user perlu reload halaman.
     const interval = window.setInterval(() => {
       void loadRows();
     }, 2500);
-
     const refresh = () => void loadRows();
     window.addEventListener("focus", refresh);
 
@@ -133,10 +173,30 @@ export default function SisaBudgetDepartmentChart() {
     };
   }, [active, loadRows]);
 
+  const periods = useMemo(() => {
+    const found = new Set(rows.map(rowMonth).filter((month) => MONTHS.includes(month)));
+    return MONTHS.filter((month) => found.has(month));
+  }, [rows]);
+
+  useEffect(() => {
+    if (!active || !periods.length) return;
+    const stored = localStorage.getItem(periodStorageKey(company)) ?? "";
+    const next = periods.includes(stored) ? stored : periods[periods.length - 1];
+    setSelectedPeriod(next);
+    if (!stored || !periods.includes(stored)) {
+      localStorage.setItem(periodStorageKey(company), next);
+    }
+  }, [active, company, periods]);
+
+  const filteredRows = useMemo(
+    () => selectedPeriod ? rows.filter((row) => rowMonth(row) === selectedPeriod) : rows,
+    [rows, selectedPeriod],
+  );
+
   const data = useMemo(() => {
     const grouped = new Map<string, Point>();
 
-    rows.forEach((row) => {
+    filteredRows.forEach((row) => {
       const department = String(value(row, ["department", "departemen", "dept"]) ?? "")
         .trim()
         .toUpperCase();
@@ -167,14 +227,36 @@ export default function SisaBudgetDepartmentChart() {
     });
 
     return Array.from(grouped.values());
-  }, [rows]);
+  }, [filteredRows]);
 
   if (!active || !host) return null;
 
   return createPortal(
     <section className="mb-6 rounded-2xl border border-gold-500/20 bg-zinc-950/80 p-5">
-      <h2 className="mb-1 text-lg font-semibold">Grafik Sisa Budget Per Departemen</h2>
-      <p className="mb-4 text-sm text-zinc-400">Sisa Budget sesuai data Excel</p>
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="mb-1 text-lg font-semibold">Grafik Sisa Budget Per Departemen</h2>
+          <p className="text-sm text-zinc-400">Sisa Budget sesuai data Excel dan periode yang dipilih.</p>
+        </div>
+        {periods.length ? (
+          <label className="text-sm text-zinc-300">
+            Periode
+            <select
+              className="input ml-2"
+              value={selectedPeriod}
+              onChange={(event) => {
+                const next = event.target.value;
+                setSelectedPeriod(next);
+                localStorage.setItem(periodStorageKey(company), next);
+              }}
+            >
+              {periods.map((period) => (
+                <option key={period} value={period}>{period}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+      </div>
 
       {data.length ? (
         <div className="h-80 w-full">
@@ -197,7 +279,7 @@ export default function SisaBudgetDepartmentChart() {
         </div>
       ) : (
         <div className="py-12 text-center text-zinc-500">
-          Belum ada data Laporan Sisa Budget per Departemen.
+          Belum ada data Laporan Sisa Budget per Departemen untuk periode ini.
         </div>
       )}
     </section>,
