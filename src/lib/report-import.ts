@@ -12,6 +12,7 @@ export type ImportBody = {
   headers?: unknown;
   rows?: unknown;
   strategy?: unknown;
+  metadata?: unknown;
 };
 
 export type ImportResult =
@@ -32,7 +33,9 @@ export async function saveReportImport(
     headers,
     rows,
     strategy = "cancel",
+    metadata,
   } = body;
+
   if (
     !["1001", "maison_y"].includes(String(company)) ||
     !isReportType(reportType) ||
@@ -53,10 +56,18 @@ export async function saveReportImport(
   }
 
   const normalizedHeaders =
-    Array.isArray(headers) &&
-    headers.every((value) => typeof value === "string")
+    Array.isArray(headers) && headers.every((value) => typeof value === "string")
       ? headers
       : Object.keys(rows[0] as Record<string, unknown>);
+
+  const normalizedMetadata =
+    metadata && typeof metadata === "object" && !Array.isArray(metadata)
+      ? {
+          periode: String((metadata as Record<string, unknown>).periode ?? "").trim(),
+          keterangan: String((metadata as Record<string, unknown>).keterangan ?? "").trim(),
+        }
+      : undefined;
+
   const hash = createHash("sha256")
     .update(JSON.stringify([fileName, sheetName, rows]))
     .digest("hex");
@@ -64,14 +75,18 @@ export async function saveReportImport(
   try {
     const report = await readReport(company as Company, reportType);
     const old = report.imports.find((item) => item.fileHash === hash);
+
     if (old && strategy === "cancel") {
       return {
         status: 409,
         body: { duplicate: true, error: "Data serupa sudah pernah diimport." },
       };
     }
-    if (old && strategy === "replace")
+
+    if (old && strategy === "replace") {
       report.imports = report.imports.filter((item) => item.id !== old.id);
+    }
+
     const importId = crypto.randomUUID();
     report.imports.push({
       id: importId,
@@ -81,7 +96,9 @@ export async function saveReportImport(
       headers: normalizedHeaders,
       rows: rows as Record<string, unknown>[],
       createdAt: new Date().toISOString(),
+      ...(normalizedMetadata ? { metadata: normalizedMetadata } : {}),
     });
+
     await writeReport(company as Company, reportType, report);
 
     return {
@@ -90,7 +107,10 @@ export async function saveReportImport(
     };
   } catch (error) {
     if (error instanceof BlobNotConfiguredError) {
-      return { status: 503, body: { error: "Penyimpanan bersama belum terhubung. Data belum disimpan." } };
+      return {
+        status: 503,
+        body: { error: "Penyimpanan bersama belum terhubung. Data belum disimpan." },
+      };
     }
     console.error("Report import failed.", error);
     return {
