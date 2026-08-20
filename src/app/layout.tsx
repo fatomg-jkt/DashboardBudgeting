@@ -18,6 +18,7 @@ import LaporanBudgetHub from '@/components/laporan-budget-hub';
 import LaporanBudgetArchiveActions from '@/components/laporan-budget-archive-actions';
 import DashboardGraphCenter from '@/components/dashboard-graph-center';
 import DashboardSisaBudgetPies from '@/components/dashboard-sisa-budget-pies';
+import DashboardSisaBudgetDetailPies from '@/components/dashboard-sisa-budget-detail-pies';
 import './globals.css';
 import './branding-fix.css';
 
@@ -62,6 +63,7 @@ export default function RootLayout({
         <LaporanBudgetArchiveActions />
         <DashboardGraphCenter />
         <DashboardSisaBudgetPies />
+        <DashboardSisaBudgetDetailPies />
         {children}
         <style>{`
           h1, h2, h3 {
