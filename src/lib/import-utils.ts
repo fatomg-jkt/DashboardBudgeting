@@ -30,6 +30,7 @@ export const templates: Record<ReportType, { header: string; example: string; fi
   pengajuan_budget:{header:'tanggal,department,category,nominal,keterangan,pic,status',example:'2026-01-15,WAREHOUSE,Operasional,10000000,Pembelian perlengkapan,Budi,Draft',filename:'template-pengajuan-budget.csv'},
   analisis_variance:{header:'tahun,bulan,department,category,budget,actual',example:'2026,Januari,WAREHOUSE,Operasional,55200000,18183659',filename:'template-analisis-variance.csv'},
   laporan_budget:{header:'Tahun,Bulan,Departemen,Total Budget,Total Aktual,Sisa Budget,Variance %',example:'2026,Juni,WAREHOUSE,55200000,18183659,37016341,67%',filename:'template-laporan-sisa-budget-per-departemen.csv'},
+  laporan_budget_upload:{header:'Judul Laporan,Periode,Keterangan,Nilai',example:'Laporan Management,Juni 2026,Contoh data,1000000',filename:'template-laporan-budget-umum.csv'},
   budget_detail_biaya:{header:detailHeader,example:detailExample,filename:'template-laporan-detail-biaya-semua-departemen.csv'},
   sisa_budget_detail_biaya:{header:detailHeader,example:detailExample,filename:'template-laporan-sisa-budget-detail-biaya-semua-departemen.csv'},
   master_data:{header:'type,code,name,active',example:'department,WH,WAREHOUSE,true',filename:'template-master-data.csv'},
