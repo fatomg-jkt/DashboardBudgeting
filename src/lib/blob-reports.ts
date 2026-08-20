@@ -12,6 +12,10 @@ export type StoredImport = {
   headers: string[];
   rows: Record<string, unknown>[];
   createdAt: string;
+  metadata?: {
+    periode?: string;
+    keterangan?: string;
+  };
 };
 export type StoredReport = { version: 1; imports: StoredImport[] };
 
