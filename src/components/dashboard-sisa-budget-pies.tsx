@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -217,7 +218,7 @@ export default function DashboardSisaBudgetPies() {
             Semua departemen · Periode: <span className="font-semibold text-gold-300">{period || "-"}</span>
           </p>
         </div>
-        <a className="secondary-button text-xs" href="/laporan-budget?view=sisa-budget-per-departemen">Buka Laporan</a>
+        <Link className="secondary-button text-xs" href="/laporan-budget?view=sisa-budget-per-departemen">Buka Laporan</Link>
       </div>
 
       {departments.length ? (
