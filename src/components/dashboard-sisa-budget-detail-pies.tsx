@@ -65,13 +65,23 @@ function numberValue(value: unknown) {
 }
 
 function departmentOf(row: ApiRow) {
-  return String(pick(row, ["department", "departemen", "dept"]) ?? "")
+  return String(
+    pick(row, [
+      "department",
+      "departemen",
+      "dept",
+      "nama_department",
+      "nama_departemen",
+    ]) ?? "",
+  )
     .trim()
     .toUpperCase();
 }
 
 function isOverBudget(row: ApiRow) {
-  const status = String(pick(row, ["status_budget", "status budget", "status"]) ?? "")
+  const status = String(
+    pick(row, ["status_budget", "status budget", "status", "budget_status"]) ?? "",
+  )
     .trim()
     .toLowerCase();
 
@@ -102,6 +112,39 @@ function isOverBudget(row: ApiRow) {
   return actual > budget;
 }
 
+function hasDepartmentRows(rows: ApiRow[]) {
+  return rows.some((row) => Boolean(departmentOf(row)));
+}
+
+function findOriginalSisaDetailSection() {
+  const links = Array.from(
+    document.querySelectorAll<HTMLAnchorElement>(
+      'a[href*="sisa-budget-detail-biaya"]',
+    ),
+  );
+
+  for (const link of links) {
+    const section = link.closest<HTMLElement>("section");
+    if (!section) continue;
+    if (section.dataset.dashboardSisaDetailReplacement === "true") continue;
+
+    const title = section.querySelector("h2")?.textContent?.trim() ?? "";
+    if (
+      title.includes("Sisa Budget") &&
+      (title.includes("Status Detail Biaya") || title.includes("Per Detail Biaya"))
+    ) {
+      return section;
+    }
+  }
+
+  const sections = Array.from(document.querySelectorAll<HTMLElement>("section"));
+  return sections.find((section) => {
+    if (section.dataset.dashboardSisaDetailReplacement === "true") return false;
+    const title = section.querySelector("h2")?.textContent?.trim() ?? "";
+    return title === "Sisa Budget - Status Detail Biaya";
+  });
+}
+
 export default function DashboardSisaBudgetDetailPies() {
   const pathname = usePathname();
   const active = pathname === "/" || pathname === "/dashboard";
@@ -111,7 +154,9 @@ export default function DashboardSisaBudgetDetailPies() {
 
   const syncCompany = useCallback(() => {
     const next: Company =
-      localStorage.getItem("budgeting_active_company") === "maison_y" ? "maison_y" : "1001";
+      localStorage.getItem("budgeting_active_company") === "maison_y"
+        ? "maison_y"
+        : "1001";
     setCompany((current) => (current === next ? current : next));
   }, []);
 
@@ -124,46 +169,49 @@ export default function DashboardSisaBudgetDetailPies() {
     syncCompany();
 
     const locate = () => {
-      const sections = Array.from(document.querySelectorAll<HTMLElement>("section"));
-      const original = sections.find(
-        (section) =>
-          section.querySelector("h2")?.textContent?.trim() ===
-          "Sisa Budget - Status Detail Biaya",
-      );
+      const original = findOriginalSisaDetailSection();
       if (!original) return;
 
-      original.style.display = "none";
+      original.style.setProperty("display", "none", "important");
+      original.setAttribute("aria-hidden", "true");
+
       const parent = original.parentElement;
       if (!parent) return;
 
-      let mount = parent.querySelector<HTMLElement>("[data-dashboard-sisa-detail-pies]");
+      let mount = parent.querySelector<HTMLElement>(
+        "[data-dashboard-sisa-detail-pies]",
+      );
       if (!mount) {
         mount = document.createElement("div");
         mount.dataset.dashboardSisaDetailPies = "true";
         mount.className = "xl:col-span-2";
         parent.insertBefore(mount, original);
       }
-      setHost(mount);
+      setHost((current) => (current === mount ? current : mount));
     };
 
     locate();
-    const observer = new MutationObserver(locate);
+    const observer = new MutationObserver(() => locate());
     observer.observe(document.body, { childList: true, subtree: true });
+    const timer = window.setInterval(locate, 500);
 
-    const handleClick = () => window.setTimeout(syncCompany, 0);
+    const handleClick = () => {
+      window.setTimeout(() => {
+        syncCompany();
+        locate();
+      }, 0);
+    };
     document.addEventListener("click", handleClick, true);
 
     return () => {
       observer.disconnect();
+      window.clearInterval(timer);
       document.removeEventListener("click", handleClick, true);
-      const sections = Array.from(document.querySelectorAll<HTMLElement>("section"));
-      sections
-        .find(
-          (section) =>
-            section.querySelector("h2")?.textContent?.trim() ===
-            "Sisa Budget - Status Detail Biaya",
-        )
-        ?.style.removeProperty("display");
+      const original = findOriginalSisaDetailSection();
+      if (original) {
+        original.style.removeProperty("display");
+        original.removeAttribute("aria-hidden");
+      }
     };
   }, [active, syncCompany]);
 
@@ -171,21 +219,48 @@ export default function DashboardSisaBudgetDetailPies() {
     if (!active) return;
 
     let cancelled = false;
-    fetch(`/api/reports?reportType=sisa_budget_detail_biaya&company=${company}`, {
-      cache: "no-store",
-    })
-      .then(async (response) => {
-        const payload: unknown = await response.json();
-        if (!cancelled) {
-          setRows(response.ok && Array.isArray(payload) ? (payload as ApiRow[]) : []);
+
+    async function load() {
+      try {
+        const primaryResponse = await fetch(
+          `/api/reports?reportType=sisa_budget_detail_biaya&company=${company}`,
+          { cache: "no-store" },
+        );
+        const primaryPayload: unknown = await primaryResponse.json();
+        const primaryRows =
+          primaryResponse.ok && Array.isArray(primaryPayload)
+            ? (primaryPayload as ApiRow[])
+            : [];
+
+        if (hasDepartmentRows(primaryRows)) {
+          if (!cancelled) setRows(primaryRows);
+          return;
         }
-      })
-      .catch(() => {
+
+        const fallbackResponse = await fetch(
+          `/api/reports?reportType=budget_detail_biaya&company=${company}`,
+          { cache: "no-store" },
+        );
+        const fallbackPayload: unknown = await fallbackResponse.json();
+        const fallbackRows =
+          fallbackResponse.ok && Array.isArray(fallbackPayload)
+            ? (fallbackPayload as ApiRow[])
+            : [];
+
+        if (!cancelled) {
+          setRows(hasDepartmentRows(fallbackRows) ? fallbackRows : primaryRows);
+        }
+      } catch {
         if (!cancelled) setRows([]);
-      });
+      }
+    }
+
+    void load();
+    const refresh = window.setInterval(() => void load(), 5000);
 
     return () => {
       cancelled = true;
+      window.clearInterval(refresh);
     };
   }, [active, company]);
 
@@ -211,7 +286,9 @@ export default function DashboardSisaBudgetDetailPies() {
     return Array.from(grouped.values()).sort((a, b) => {
       const aIndex = DEPARTMENT_ORDER.indexOf(a.department);
       const bIndex = DEPARTMENT_ORDER.indexOf(b.department);
-      if (aIndex === -1 && bIndex === -1) return a.department.localeCompare(b.department);
+      if (aIndex === -1 && bIndex === -1) {
+        return a.department.localeCompare(b.department);
+      }
       if (aIndex === -1) return 1;
       if (bIndex === -1) return -1;
       return aIndex - bIndex;
@@ -221,12 +298,15 @@ export default function DashboardSisaBudgetDetailPies() {
   if (!active || !host) return null;
 
   return createPortal(
-    <section className="rounded-2xl border border-gold-500/20 bg-gradient-to-b from-zinc-950 to-black p-4">
+    <section
+      data-dashboard-sisa-detail-replacement="true"
+      className="rounded-2xl border border-gold-500/20 bg-gradient-to-b from-zinc-950 to-black p-4"
+    >
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Sisa Budget - Per Detail Biaya</h2>
           <p className="mt-1 text-sm text-zinc-400">
-            Status Over Budget dan Under Budget untuk semua departemen.
+            Semua departemen dalam pie chart kecil: Over Budget vs Under Budget.
           </p>
         </div>
         <Link
@@ -246,6 +326,9 @@ export default function DashboardSisaBudgetDetailPies() {
                 { name: "Over Budget", value: item.over },
                 { name: "Under Budget", value: item.under },
               ].filter((entry) => entry.value > 0);
+              const chartData = data.length
+                ? data
+                : [{ name: "Under Budget", value: 1 }];
 
               return (
                 <div
@@ -259,21 +342,23 @@ export default function DashboardSisaBudgetDetailPies() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={data.length ? data : [{ name: "Under Budget", value: 1 }]}
+                          data={chartData}
                           dataKey="value"
                           nameKey="name"
                           innerRadius={16}
                           outerRadius={34}
                           stroke="none"
                         >
-                          {(data.length ? data : [{ name: "Under Budget", value: 1 }]).map(
-                            (entry) => (
-                              <Cell
-                                key={entry.name}
-                                fill={entry.name === "Over Budget" ? "#EF4444" : "#2A9D8F"}
-                              />
-                            ),
-                          )}
+                          {chartData.map((entry) => (
+                            <Cell
+                              key={entry.name}
+                              fill={
+                                entry.name === "Over Budget"
+                                  ? "#EF4444"
+                                  : "#2A9D8F"
+                              }
+                            />
+                          ))}
                         </Pie>
                         <Tooltip
                           formatter={(value: number | string, name: string) => [
@@ -290,7 +375,9 @@ export default function DashboardSisaBudgetDetailPies() {
                   <p className="text-[10px] leading-tight text-emerald-400">
                     Under {item.under}
                   </p>
-                  <p className="mt-0.5 text-[9px] text-zinc-500">Total {total} item</p>
+                  <p className="mt-0.5 text-[9px] text-zinc-500">
+                    Total {total} item
+                  </p>
                 </div>
               );
             })}
@@ -298,16 +385,18 @@ export default function DashboardSisaBudgetDetailPies() {
 
           <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs">
             <span className="inline-flex items-center gap-1 text-red-400">
-              <span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Over Budget
+              <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+              Over Budget
             </span>
             <span className="inline-flex items-center gap-1 text-emerald-400">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#2A9D8F]" /> Under Budget
+              <span className="h-2.5 w-2.5 rounded-full bg-[#2A9D8F]" />
+              Under Budget
             </span>
           </div>
         </>
       ) : (
         <div className="py-10 text-center text-sm text-zinc-500">
-          Belum ada data Sisa Budget Per Detail Biaya.
+          Belum ada data Per Detail Biaya yang memiliki informasi departemen.
         </div>
       )}
     </section>,
