@@ -15,6 +15,10 @@ export type StoredImport = {
   metadata?: {
     periode?: string;
     keterangan?: string;
+    storagePath?: string;
+    originalFileName?: string;
+    contentType?: string;
+    size?: number;
   };
 };
 export type StoredReport = { version: 1; imports: StoredImport[] };
