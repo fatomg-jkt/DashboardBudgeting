@@ -9,10 +9,10 @@ function renameBudgetReportMenu() {
     .forEach((link) => {
       link.childNodes.forEach((node) => {
         if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
-          node.textContent = "Ringkasan Laporan Budget";
+          node.textContent = "Ringkasan Budget";
         }
       });
-      link.setAttribute("aria-label", "Ringkasan Laporan Budget");
+      link.setAttribute("aria-label", "Ringkasan Budget");
     });
 }
 
