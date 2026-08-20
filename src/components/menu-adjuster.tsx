@@ -139,7 +139,7 @@ export default function MenuAdjuster() {
             budgetDept = budgetLink.cloneNode(true) as HTMLAnchorElement;
             budgetDept.href = "/budget-vs-actual?view=per-departemen";
             budgetDept.dataset.budgetSubmenu = "per-departemen";
-            setMenuLabel(budgetDept, "Laporan Per Departemen");
+            setMenuLabel(budgetDept, "Per Departemen");
             budgetDept.classList.add("ml-6");
             makeInactive(budgetDept);
             budgetLink.insertAdjacentElement("afterend", budgetDept);
@@ -152,7 +152,7 @@ export default function MenuAdjuster() {
             budgetDetail = budgetLink.cloneNode(true) as HTMLAnchorElement;
             budgetDetail.href = "/budget-vs-actual?view=detail-biaya";
             budgetDetail.dataset.budgetSubmenu = "detail-biaya";
-            setMenuLabel(budgetDetail, "Laporan Per Detail Biaya");
+            setMenuLabel(budgetDetail, "Per Detail Biaya");
             budgetDetail.classList.add("ml-6");
             makeInactive(budgetDetail);
             budgetDept.insertAdjacentElement("afterend", budgetDetail);
@@ -181,7 +181,7 @@ export default function MenuAdjuster() {
             sisaDept = budgetLink.cloneNode(true) as HTMLAnchorElement;
             sisaDept.href = "/laporan-budget?view=sisa-budget-per-departemen";
             sisaDept.dataset.sisaSubmenu = "per-departemen";
-            setMenuLabel(sisaDept, "Laporan Per Departemen");
+            setMenuLabel(sisaDept, "Per Departemen");
             sisaDept.classList.add("ml-6");
             makeInactive(sisaDept);
             sisa.insertAdjacentElement("afterend", sisaDept);
@@ -195,7 +195,7 @@ export default function MenuAdjuster() {
             sisaDetail = budgetLink.cloneNode(true) as HTMLAnchorElement;
             sisaDetail.href = "/laporan-budget?view=sisa-budget-detail-biaya";
             sisaDetail.dataset.sisaSubmenu = "detail-biaya";
-            setMenuLabel(sisaDetail, "Laporan Per Detail Biaya");
+            setMenuLabel(sisaDetail, "Per Detail Biaya");
             sisaDetail.classList.add("ml-6");
             makeInactive(sisaDetail);
             sisaDept.insertAdjacentElement("afterend", sisaDetail);
