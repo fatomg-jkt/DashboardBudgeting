@@ -14,6 +14,32 @@ function setMenuLabel(link: HTMLAnchorElement, label: string) {
   if (!changed) link.append(document.createTextNode(label));
 }
 
+function replaceWithSisaBudgetIcon(link: HTMLAnchorElement) {
+  const existing = link.querySelector("svg");
+  if (!existing) return;
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("h-5", "w-5");
+
+  const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+  circle.setAttribute("cx", "12");
+  circle.setAttribute("cy", "12");
+  circle.setAttribute("r", "9");
+
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", "M12 3v9h9");
+
+  svg.append(circle, path);
+  existing.replaceWith(svg);
+}
+
 function makeInactive(link: HTMLAnchorElement) {
   link.classList.remove("bg-gold-500", "font-semibold", "text-black");
   if (link.classList.contains("text-xs")) {
@@ -57,7 +83,9 @@ export default function MenuAdjuster() {
   useEffect(() => {
     const applyMenuChanges = () => {
       document
-        .querySelectorAll<HTMLAnchorElement>('a[href="/budget-planning"], a[href="/monitoring-budget"]')
+        .querySelectorAll<HTMLAnchorElement>(
+          'a[href="/budget-planning"], a[href="/monitoring-budget"], a[href="/master-data"]',
+        )
         .forEach((link) => {
           link.style.display = "none";
           link.setAttribute("aria-hidden", "true");
@@ -140,8 +168,11 @@ export default function MenuAdjuster() {
             sisa.dataset.menuSisaBudget = "true";
             sisa.setAttribute("aria-label", "Laporan Sisa Budget");
             setMenuLabel(sisa, "Laporan Sisa Budget");
+            replaceWithSisaBudgetIcon(sisa);
             makeInactive(sisa);
             budgetDetail.insertAdjacentElement("afterend", sisa);
+          } else {
+            replaceWithSisaBudgetIcon(sisa);
           }
 
           let sisaDept = parent.querySelector<HTMLAnchorElement>(
