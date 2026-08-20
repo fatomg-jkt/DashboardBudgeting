@@ -13,6 +13,7 @@ import MonthlyYtdBudgetReport from '@/components/monthly-ytd-budget-report';
 import YtdDetailReportEnhancer from '@/components/ytd-detail-report-enhancer';
 import YtdManagementSummary from '@/components/ytd-management-summary';
 import RealisasiBudgetEnhancer from '@/components/realisasi-budget-enhancer';
+import RealisasiMenuActiveFix from '@/components/realisasi-menu-active-fix';
 import LaporanBudgetHub from '@/components/laporan-budget-hub';
 import LaporanBudgetArchiveActions from '@/components/laporan-budget-archive-actions';
 import './globals.css';
@@ -54,6 +55,7 @@ export default function RootLayout({
         <YtdDetailReportEnhancer />
         <YtdManagementSummary />
         <RealisasiBudgetEnhancer />
+        <RealisasiMenuActiveFix />
         <LaporanBudgetHub />
         <LaporanBudgetArchiveActions />
         {children}
