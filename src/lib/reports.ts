@@ -8,6 +8,7 @@ export const REPORTS = {
   pengajuan_budget: 'Pengajuan Budget',
   analisis_variance: 'Analisis Variance',
   laporan_budget: 'Laporan Budget',
+  laporan_budget_upload: 'Laporan Excel Tersimpan',
   budget_detail_biaya: 'Laporan Per Detail Biaya',
   monthly_budget_actual: 'Monthly Budget vs Actual',
   cumulative_budget_actual_ytd: 'Cumulative Budget vs Actual YTD',
