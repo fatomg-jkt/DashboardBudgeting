@@ -209,19 +209,19 @@ export default function DashboardSisaBudgetPies() {
   if (!active || !host) return null;
 
   return createPortal(
-    <section className="rounded-2xl border border-gold-500/20 bg-gradient-to-b from-zinc-950 to-black p-5 xl:col-span-2">
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+    <section className="rounded-2xl border border-gold-500/20 bg-gradient-to-b from-zinc-950 to-black p-4 xl:col-span-2">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Sisa Budget - Per Departemen</h2>
           <p className="mt-1 text-sm text-zinc-400">
-            Pie chart ringkas seluruh departemen · Periode terakhir dipilih: <span className="font-semibold text-gold-300">{period || "-"}</span>
+            Semua departemen · Periode: <span className="font-semibold text-gold-300">{period || "-"}</span>
           </p>
         </div>
         <a className="secondary-button text-xs" href="/laporan-budget?view=sisa-budget-per-departemen">Buka Laporan</a>
       </div>
 
       {departments.length ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10">
           {departments.map((item) => {
             const safeRemaining = Math.max(item.remaining, 0);
             const safeActual = Math.max(item.actual, 0);
@@ -232,12 +232,19 @@ export default function DashboardSisaBudgetPies() {
             const utilization = item.budget > 0 ? (item.actual / item.budget) * 100 : 0;
 
             return (
-              <div key={item.department} className="rounded-xl border border-zinc-800 bg-black/30 p-3 text-center">
-                <p className="min-h-10 text-xs font-semibold text-zinc-200">{item.department}</p>
-                <div className="mx-auto h-28 w-28">
+              <div key={item.department} className="rounded-lg border border-zinc-800 bg-black/30 p-2 text-center">
+                <p className="min-h-8 text-[10px] font-semibold leading-tight text-zinc-200">{item.department}</p>
+                <div className="mx-auto h-20 w-20">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={pieData.length ? pieData : [{ name: "Sisa", value: 1 }]} dataKey="value" nameKey="name" innerRadius={22} outerRadius={47} stroke="none">
+                      <Pie
+                        data={pieData.length ? pieData : [{ name: "Sisa", value: 1 }]}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={16}
+                        outerRadius={34}
+                        stroke="none"
+                      >
                         {(pieData.length ? pieData : [{ name: "Sisa", value: 1 }]).map((entry) => (
                           <Cell key={entry.name} fill={entry.name === "Actual" ? "#EF4444" : "#2A9D8F"} />
                         ))}
@@ -246,10 +253,10 @@ export default function DashboardSisaBudgetPies() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <p className="text-xs text-zinc-400">Budget {shortMoney(item.budget)}</p>
-                <p className="mt-1 text-xs"><span className="text-red-400">Actual {shortMoney(item.actual)}</span></p>
-                <p className="text-xs"><span className="text-emerald-400">Sisa {shortMoney(item.remaining)}</span></p>
-                <p className="mt-1 text-[11px] text-zinc-500">Terpakai {utilization.toLocaleString("id-ID", { maximumFractionDigits: 1 })}%</p>
+                <p className="text-[10px] leading-tight text-zinc-400">Budget {shortMoney(item.budget)}</p>
+                <p className="mt-0.5 text-[10px] leading-tight text-red-400">Actual {shortMoney(item.actual)}</p>
+                <p className="text-[10px] leading-tight text-emerald-400">Sisa {shortMoney(item.remaining)}</p>
+                <p className="mt-0.5 text-[9px] text-zinc-500">{utilization.toLocaleString("id-ID", { maximumFractionDigits: 1 })}% terpakai</p>
               </div>
             );
           })}
