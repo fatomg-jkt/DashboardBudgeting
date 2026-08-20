@@ -16,6 +16,30 @@ function renameBudgetReportMenu() {
     });
 }
 
+function renameRealisasiSubmenus() {
+  document
+    .querySelectorAll<HTMLAnchorElement>('a[href="/realisasi-budget?view=bulanan"]')
+    .forEach((link) => {
+      link.childNodes.forEach((node) => {
+        if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+          node.textContent = "Realisasi Bulanan";
+        }
+      });
+      link.setAttribute("aria-label", "Realisasi Bulanan");
+    });
+
+  document
+    .querySelectorAll<HTMLAnchorElement>('a[href="/realisasi-budget?view=per-departemen"]')
+    .forEach((link) => {
+      link.childNodes.forEach((node) => {
+        if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
+          node.textContent = "Per Departemen";
+        }
+      });
+      link.setAttribute("aria-label", "Per Departemen");
+    });
+}
+
 function renamePageTitle() {
   const params = new URLSearchParams(window.location.search);
   if (window.location.pathname !== "/laporan-budget" || params.get("view")) return;
@@ -91,6 +115,7 @@ export default function LaporanBudgetArchiveActions() {
   useEffect(() => {
     const apply = () => {
       renameBudgetReportMenu();
+      renameRealisasiSubmenus();
       renamePageTitle();
       addDeleteButtons();
     };
