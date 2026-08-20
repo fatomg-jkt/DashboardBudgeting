@@ -1,6 +1,6 @@
 import "server-only";
 
-import { get, put } from "@vercel/blob";
+import { del, get, put } from "@vercel/blob";
 import { BlobNotConfiguredError, blobToken, type Company } from "@/lib/blob-reports";
 
 export type BudgetArchiveItem = {
@@ -116,4 +116,21 @@ export async function getBudgetArchive(company: Company, id: string) {
   if (!result) return null;
 
   return { item, stream: result.stream };
+}
+
+export async function deleteBudgetArchive(company: Company, id: string) {
+  const token = blobToken();
+  if (!token) throw new BlobNotConfiguredError("Vercel Blob belum dikonfigurasi.");
+
+  const index = await readIndex(company);
+  const item = index.items.find((entry) => entry.id === id);
+  if (!item) return false;
+
+  await del(item.storagePath, { token });
+  await writeIndex(company, {
+    version: 1,
+    items: index.items.filter((entry) => entry.id !== id),
+  });
+
+  return true;
 }
