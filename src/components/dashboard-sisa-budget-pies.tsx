@@ -130,7 +130,9 @@ export default function DashboardSisaBudgetPies() {
       );
       if (!original) return;
 
-      original.style.display = "none";
+      // Keep the original green Sisa Budget bar chart visible on the Dashboard.
+      original.style.removeProperty("display");
+
       const parent = original.parentElement;
       if (!parent) return;
 
