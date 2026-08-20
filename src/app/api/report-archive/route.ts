@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { BlobNotConfiguredError, type Company } from "@/lib/blob-reports";
-import { listBudgetArchives, saveBudgetArchive } from "@/lib/report-archive";
+import { deleteBudgetArchive, listBudgetArchives, saveBudgetArchive } from "@/lib/report-archive";
 
 export const runtime = "nodejs";
 
@@ -63,5 +63,33 @@ export async function POST(request: Request) {
     }
     console.error("Save report archive failed.", error);
     return NextResponse.json({ error: "File Excel gagal disimpan." }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const params = new URL(request.url).searchParams;
+    const company = params.get("company");
+    const id = String(params.get("id") ?? "").trim();
+
+    if (!validCompany(company)) {
+      return NextResponse.json({ error: "Perusahaan tidak valid." }, { status: 400 });
+    }
+    if (!id) {
+      return NextResponse.json({ error: "ID arsip wajib diisi." }, { status: 400 });
+    }
+
+    const deleted = await deleteBudgetArchive(company, id);
+    if (!deleted) {
+      return NextResponse.json({ error: "Arsip tidak ditemukan." }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    if (error instanceof BlobNotConfiguredError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
+    console.error("Delete report archive failed.", error);
+    return NextResponse.json({ error: "Arsip gagal dihapus." }, { status: 500 });
   }
 }
