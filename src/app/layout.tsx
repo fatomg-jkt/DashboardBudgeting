@@ -69,6 +69,16 @@ export default function RootLayout({
           h1, h2, h3 {
             font-family: var(--font-title), serif;
           }
+
+          /* Only adjust the app shell colors requested by the user. */
+          body > div.min-h-screen,
+          main {
+            background: #e8e8e6 !important;
+          }
+
+          aside.fixed.inset-y-0.left-0 {
+            background: #171717 !important;
+          }
         `}</style>
       </body>
     </html>
