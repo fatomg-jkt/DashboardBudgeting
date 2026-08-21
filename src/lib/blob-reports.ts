@@ -1,6 +1,6 @@
 import "server-only";
 
-import { get, put } from "@vercel/blob";
+import { del, get, put } from "@vercel/blob";
 import type { ReportType } from "@/lib/reports";
 
 export type Company = "1001" | "maison_y";
@@ -48,6 +48,30 @@ export async function readReport(
     : { version: 1, imports: [] };
 }
 
+function isOverwriteConflict(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("already exists") ||
+    normalized.includes("allowoverwrite") ||
+    normalized.includes("overwrite") ||
+    normalized.includes("conflict") ||
+    normalized.includes("precondition") ||
+    normalized.includes("409") ||
+    normalized.includes("412")
+  );
+}
+
+async function putReport(path: string, payload: string, token: string) {
+  return put(path, payload, {
+    access: "private",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType: "application/json",
+    token,
+  });
+}
+
 export async function writeReport(
   company: Company,
   reportType: ReportType,
@@ -55,11 +79,25 @@ export async function writeReport(
 ) {
   const token = blobToken();
   if (!token) throw new BlobNotConfiguredError("Vercel Blob belum dikonfigurasi.");
-  return put(blobPath(company, reportType), JSON.stringify(report), {
-    access: "private",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-    token,
-  });
+
+  const path = blobPath(company, reportType);
+  const payload = JSON.stringify(report);
+
+  try {
+    return await putReport(path, payload, token);
+  } catch (error) {
+    // Some Blob stores can still return an overwrite/conflict response even when
+    // allowOverwrite=true. Retry by removing the stale object and recreating it.
+    // The complete report is already held in memory, so the replacement keeps all
+    // existing imports plus the new import being saved.
+    if (!isOverwriteConflict(error)) throw error;
+
+    console.warn("Vercel Blob overwrite conflict. Retrying with delete + recreate.", {
+      path,
+      message: error instanceof Error ? error.message : String(error),
+    });
+
+    await del(path, { token });
+    return putReport(path, payload, token);
+  }
 }
