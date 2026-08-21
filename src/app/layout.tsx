@@ -70,10 +70,10 @@ export default function RootLayout({
             font-family: var(--font-title), serif;
           }
 
-          /* Only adjust the app shell colors requested by the user. */
+          /* Restore the original dark dashboard background. */
           body > div.min-h-screen,
           main {
-            background: #e8e8e6 !important;
+            background: #070707 !important;
           }
 
           aside.fixed.inset-y-0.left-0 {
