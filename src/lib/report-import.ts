@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { BlobNotConfiguredError, readReport, writeReport, type Company } from "@/lib/blob-reports";
 import { isReportType } from "@/lib/reports";
 
@@ -87,7 +87,7 @@ export async function saveReportImport(
       report.imports = report.imports.filter((item) => item.id !== old.id);
     }
 
-    const importId = crypto.randomUUID();
+    const importId = randomUUID();
     report.imports.push({
       id: importId,
       fileHash: strategy === "new" ? `${hash}-${Date.now()}` : hash,
@@ -112,10 +112,17 @@ export async function saveReportImport(
         body: { error: "Penyimpanan bersama belum terhubung. Data belum disimpan." },
       };
     }
-    console.error("Report import failed.", error);
+
+    const detail = error instanceof Error ? error.message : String(error ?? "");
+    console.error("Report import failed.", { company, reportType, detail, error });
+
     return {
       status: 500,
-      body: { error: "Data gagal disimpan. Silakan coba kembali." },
+      body: {
+        error: detail
+          ? `Data gagal disimpan: ${detail}`
+          : "Data gagal disimpan. Silakan coba kembali.",
+      },
     };
   }
 }
