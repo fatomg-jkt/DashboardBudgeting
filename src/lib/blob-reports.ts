@@ -1,6 +1,7 @@
 import "server-only";
 
-import { del, get, put } from "@vercel/blob";
+import { randomUUID } from "node:crypto";
+import { get, list, put } from "@vercel/blob";
 import type { ReportType } from "@/lib/reports";
 
 export type Company = "1001" | "maison_y";
@@ -23,12 +24,49 @@ export type StoredImport = {
 };
 export type StoredReport = { version: 1; imports: StoredImport[] };
 
+type BlobAccess = "private" | "public";
+
 export class BlobNotConfiguredError extends Error {}
 
+// Legacy path kept for backwards compatibility with data that is already stored.
 export const blobPath = (company: Company, reportType: ReportType) =>
   `budgeting/v1/${company}/${reportType}.json`;
 
+const versionPrefix = (company: Company, reportType: ReportType) =>
+  `budgeting/v2/${company}/${reportType}/`;
+
 export const blobToken = () => process.env.BLOB_READ_WRITE_TOKEN;
+
+function validStoredReport(value: unknown): StoredReport | null {
+  if (!value || typeof value !== "object") return null;
+  const report = value as Partial<StoredReport>;
+  return report.version === 1 && Array.isArray(report.imports)
+    ? (report as StoredReport)
+    : null;
+}
+
+async function readJsonBlob(path: string, token: string): Promise<StoredReport | null> {
+  let firstError: unknown;
+
+  for (const access of ["private", "public"] as const satisfies readonly BlobAccess[]) {
+    try {
+      const result = await get(path, {
+        access,
+        token,
+        useCache: false,
+      });
+      if (!result) return null;
+      const value = await new Response(result.stream).json();
+      return validStoredReport(value);
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+
+  throw firstError instanceof Error
+    ? firstError
+    : new Error("Vercel Blob gagal dibaca.");
+}
 
 export async function readReport(
   company: Company,
@@ -36,40 +74,50 @@ export async function readReport(
 ): Promise<StoredReport> {
   const token = blobToken();
   if (!token) throw new BlobNotConfiguredError("Vercel Blob belum dikonfigurasi.");
-  const result = await get(blobPath(company, reportType), {
-    access: "private",
-    token,
-    useCache: false,
-  });
-  if (!result) return { version: 1, imports: [] };
-  const value = (await new Response(result.stream).json()) as StoredReport;
-  return value?.version === 1 && Array.isArray(value.imports)
-    ? value
-    : { version: 1, imports: [] };
-}
 
-function isOverwriteConflict(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes("already exists") ||
-    normalized.includes("allowoverwrite") ||
-    normalized.includes("overwrite") ||
-    normalized.includes("conflict") ||
-    normalized.includes("precondition") ||
-    normalized.includes("409") ||
-    normalized.includes("412")
-  );
-}
-
-async function putReport(path: string, payload: string, token: string) {
-  return put(path, payload, {
-    access: "private",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
+  // New storage format: every save creates a new immutable version. This avoids
+  // overwrite/precondition conflicts on Vercel Blob and makes saving reliable.
+  const versions = await list({
+    prefix: versionPrefix(company, reportType),
+    limit: 1000,
     token,
   });
+
+  const latest = versions.blobs
+    .filter((blob) => blob.pathname.endsWith(".json"))
+    .sort((a, b) => b.pathname.localeCompare(a.pathname))[0];
+
+  if (latest) {
+    const report = await readJsonBlob(latest.pathname, token);
+    if (report) return report;
+  }
+
+  // Fallback to the old deterministic v1 file so existing dashboard data is
+  // preserved automatically after this change.
+  const legacy = await readJsonBlob(blobPath(company, reportType), token);
+  return legacy ?? { version: 1, imports: [] };
+}
+
+async function putJsonBlob(path: string, payload: string, token: string) {
+  let firstError: unknown;
+
+  // The connected Blob store may be private or public. Try the intended private
+  // mode first, then public as a compatibility fallback for older stores.
+  for (const access of ["private", "public"] as const satisfies readonly BlobAccess[]) {
+    try {
+      return await put(path, payload, {
+        access,
+        addRandomSuffix: false,
+        contentType: "application/json",
+        token,
+      });
+    } catch (error) {
+      firstError ??= error;
+    }
+  }
+
+  const detail = firstError instanceof Error ? firstError.message : String(firstError ?? "");
+  throw new Error(detail || "Vercel Blob gagal ditulis.");
 }
 
 export async function writeReport(
@@ -80,24 +128,7 @@ export async function writeReport(
   const token = blobToken();
   if (!token) throw new BlobNotConfiguredError("Vercel Blob belum dikonfigurasi.");
 
-  const path = blobPath(company, reportType);
-  const payload = JSON.stringify(report);
-
-  try {
-    return await putReport(path, payload, token);
-  } catch (error) {
-    // Some Blob stores can still return an overwrite/conflict response even when
-    // allowOverwrite=true. Retry by removing the stale object and recreating it.
-    // The complete report is already held in memory, so the replacement keeps all
-    // existing imports plus the new import being saved.
-    if (!isOverwriteConflict(error)) throw error;
-
-    console.warn("Vercel Blob overwrite conflict. Retrying with delete + recreate.", {
-      path,
-      message: error instanceof Error ? error.message : String(error),
-    });
-
-    await del(path, { token });
-    return putReport(path, payload, token);
-  }
+  const timestamp = String(Date.now()).padStart(13, "0");
+  const path = `${versionPrefix(company, reportType)}${timestamp}-${randomUUID()}.json`;
+  return putJsonBlob(path, JSON.stringify(report), token);
 }
