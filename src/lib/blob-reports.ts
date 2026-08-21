@@ -30,7 +30,6 @@ type BlobAuth = { oidcToken: string; storeId?: string } | { token: string };
 
 export class BlobNotConfiguredError extends Error {}
 
-// Legacy path kept for backwards compatibility with data that is already stored.
 export const blobPath = (company: Company, reportType: ReportType) =>
   `budgeting/v1/${company}/${reportType}.json`;
 
@@ -46,8 +45,6 @@ async function blobAuthCandidates(): Promise<BlobAuth[]> {
     process.env.VERCEL_BLOB_STORE_ID ||
     process.env.BLOB_STORE;
 
-  // Prefer Vercel project OIDC in production. It rotates automatically and avoids
-  // failures caused by an old/stale BLOB_READ_WRITE_TOKEN.
   try {
     const oidcToken = await getVercelOidcToken();
     if (oidcToken) {
@@ -140,26 +137,50 @@ export async function readReport(
 ): Promise<StoredReport> {
   const authCandidates = await blobAuthCandidates();
 
-  // New storage format: every save creates a new immutable version. This avoids
-  // overwrite/precondition conflicts on Vercel Blob and makes saving reliable.
-  const versions = await listVersions(company, reportType, authCandidates);
+  // Saving a new import should not be blocked just because an old Blob object
+  // became unreadable (for example after a Blob store/access-mode migration).
+  // We still try to preserve existing imports first, but gracefully fall back to
+  // an empty report when legacy reads return 403/404/other Blob read errors.
+  try {
+    const versions = await listVersions(company, reportType, authCandidates);
+    const candidates = versions.blobs
+      .filter((blob) => blob.pathname.endsWith(".json"))
+      .sort((a, b) => b.pathname.localeCompare(a.pathname));
 
-  const latest = versions.blobs
-    .filter((blob) => blob.pathname.endsWith(".json"))
-    .sort((a, b) => b.pathname.localeCompare(a.pathname))[0];
-
-  if (latest) {
-    const report = await readJsonBlob(latest.pathname, authCandidates);
-    if (report) return report;
+    for (const blob of candidates) {
+      try {
+        const report = await readJsonBlob(blob.pathname, authCandidates);
+        if (report) return report;
+      } catch (error) {
+        console.warn("Skipping unreadable report Blob version.", {
+          pathname: blob.pathname,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  } catch (error) {
+    console.warn("Unable to list report Blob versions; continuing with legacy/new save.", {
+      company,
+      reportType,
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
 
-  // Fallback to the old deterministic v1 file so existing dashboard data is
-  // preserved automatically after this change.
-  const legacy = await readJsonBlob(
-    blobPath(company, reportType),
-    authCandidates,
-  );
-  return legacy ?? { version: 1, imports: [] };
+  try {
+    const legacy = await readJsonBlob(
+      blobPath(company, reportType),
+      authCandidates,
+    );
+    if (legacy) return legacy;
+  } catch (error) {
+    console.warn("Legacy report Blob is unreadable; starting a fresh report version.", {
+      company,
+      reportType,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  return { version: 1, imports: [] };
 }
 
 async function putJsonBlob(
