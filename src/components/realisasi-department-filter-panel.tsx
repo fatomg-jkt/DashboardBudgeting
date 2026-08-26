@@ -37,6 +37,20 @@ const MONTHS = [
   "November",
   "Desember",
 ];
+
+const FIXED_DEPARTMENTS = [
+  "WAREHOUSE",
+  "PURCHASING",
+  "OPERASIONAL",
+  "MERCHANDISE",
+  "MARKETING",
+  "MANAGEMENT UMA",
+  "MANAGEMENT KIKI",
+  "HRD",
+  "FAT",
+  "DEVELOPMENT",
+];
+
 const nf = new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 });
 
 function norm(value: unknown) {
@@ -247,22 +261,25 @@ export default function RealisasiDepartmentFilterPanel() {
     };
   }, [mount, company]);
 
-  const periods = useMemo(() => {
-    const map = new Map<string, Period>();
-    rows.forEach((row) => {
-      const period = periodFor(row);
-      if (!map.has(period.key)) map.set(period.key, period);
-    });
-    return Array.from(map.values()).sort((a, b) => a.sort - b.sort);
+  const activeYear = useMemo(() => {
+    const years = rows.map((row) => yearNumber(row.tahun)).filter((year) => year > 0);
+    return years.length ? Math.max(...years) : 2026;
   }, [rows]);
 
-  const departments = useMemo(
-    () => Array.from(new Set(rows.map((row) => row.department).filter(Boolean))).sort(),
-    [rows],
+  const periods = useMemo<Period[]>(
+    () =>
+      MONTHS.map((label, index) => {
+        const monthNo = index + 1;
+        return {
+          key: `${activeYear}-${String(monthNo).padStart(2, "0")}`,
+          label: `${label} ${activeYear}`,
+          sort: activeYear * 100 + monthNo,
+        };
+      }),
+    [activeYear],
   );
 
   useEffect(() => {
-    if (!periods.length) return;
     setFromPeriod((current) =>
       current && periods.some((period) => period.key === current) ? current : periods[0].key,
     );
@@ -272,9 +289,9 @@ export default function RealisasiDepartmentFilterPanel() {
         : periods[periods.length - 1].key,
     );
     setDepartment((current) =>
-      current === "ALL" || departments.includes(current) ? current : "ALL",
+      current === "ALL" || FIXED_DEPARTMENTS.includes(current) ? current : "ALL",
     );
-  }, [periods, departments]);
+  }, [periods]);
 
   const filteredRows = useMemo(() => {
     const from = periods.find((period) => period.key === fromPeriod)?.sort ?? -Infinity;
@@ -327,7 +344,7 @@ export default function RealisasiDepartmentFilterPanel() {
           <label className="text-sm text-zinc-300">
             <span className="mb-2 block">Dari Periode</span>
             <select
-              className="input w-full"
+              className="input w-full cursor-pointer"
               value={fromPeriod}
               onChange={(event) => setFromPeriod(event.target.value)}
             >
@@ -340,7 +357,7 @@ export default function RealisasiDepartmentFilterPanel() {
           <label className="text-sm text-zinc-300">
             <span className="mb-2 block">Sampai Periode</span>
             <select
-              className="input w-full"
+              className="input w-full cursor-pointer"
               value={toPeriod}
               onChange={(event) => setToPeriod(event.target.value)}
             >
@@ -353,12 +370,12 @@ export default function RealisasiDepartmentFilterPanel() {
           <label className="text-sm text-zinc-300">
             <span className="mb-2 block">Departemen</span>
             <select
-              className="input w-full"
+              className="input w-full cursor-pointer"
               value={department}
               onChange={(event) => setDepartment(event.target.value)}
             >
               <option value="ALL">Semua Departemen</option>
-              {departments.map((item) => (
+              {FIXED_DEPARTMENTS.map((item) => (
                 <option key={item} value={item}>{item}</option>
               ))}
             </select>
