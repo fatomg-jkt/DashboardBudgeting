@@ -1,4 +1,4 @@
-import { readReport, type Company } from "@/lib/blob-reports";
+import { readReport, type Company } from "@/lib/supabase-reports";
 import { isReportType } from "@/lib/reports";
 import { NextResponse } from "next/server";
 
