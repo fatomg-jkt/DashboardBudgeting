@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 type DesiredColumn = {
   label: string;
@@ -30,6 +30,8 @@ function token(value: string) {
 }
 
 function fixTable(table: HTMLTableElement) {
+  if (table.dataset.budgetDepartmentTable === "formatted") return;
+
   const headerRow = table.querySelector<HTMLTableRowElement>("thead tr");
   const bodyRows = Array.from(table.querySelectorAll<HTMLTableRowElement>("tbody tr"));
   if (!headerRow || !bodyRows.length) return;
@@ -42,11 +44,16 @@ function fixTable(table: HTMLTableElement) {
     return headerTokens.findIndex((header) => aliases.includes(header));
   });
 
-  const requiredMatches = matches.filter((index) => index >= 0).length;
+  const hasYear = matches[0] >= 0;
+  const hasMonth = matches[1] >= 0;
+  const hasDepartment = matches[2] >= 0;
   const hasBudget = matches[4] >= 0;
   const hasActual = matches[5] >= 0;
-  const hasDepartment = matches[2] >= 0;
-  if (requiredMatches < 5 || !hasBudget || !hasActual || !hasDepartment) return;
+  if (!hasYear || !hasMonth || !hasDepartment || !hasBudget || !hasActual) return;
+
+  const originalRows = bodyRows.map((row) =>
+    Array.from(row.querySelectorAll<HTMLTableCellElement>("td")),
+  );
 
   const orderedHeaderCells = matches
     .map((index, desiredIndex) => {
@@ -57,14 +64,21 @@ function fixTable(table: HTMLTableElement) {
     })
     .filter((cell): cell is HTMLTableCellElement => Boolean(cell));
 
-  const originalRows = bodyRows.map((row) => Array.from(row.querySelectorAll<HTMLTableCellElement>("td")));
-
   headerRow.replaceChildren(...orderedHeaderCells);
+
   bodyRows.forEach((row, rowIndex) => {
     const cells = originalRows[rowIndex];
     const orderedCells = matches
       .map((index) => (index >= 0 ? cells[index] : null))
       .filter((cell): cell is HTMLTableCellElement => Boolean(cell));
+
+    // The generic number formatter can render 2026 as 2.026. Restore a plain year.
+    const yearCell = orderedCells[0];
+    if (yearCell) {
+      const digits = (yearCell.textContent ?? "").replace(/\D/g, "");
+      if (digits.length === 4) yearCell.textContent = digits;
+    }
+
     row.replaceChildren(...orderedCells);
   });
 
@@ -73,11 +87,12 @@ function fixTable(table: HTMLTableElement) {
 
 export default function BudgetVsActualDepartmentTable() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const view = searchParams.get("view");
 
   useEffect(() => {
-    if (pathname !== "/budget-vs-actual" || view !== "per-departemen") return;
+    if (pathname !== "/budget-vs-actual") return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("view") !== "per-departemen") return;
 
     const apply = () => {
       document.querySelectorAll<HTMLTableElement>("table.data-table").forEach(fixTable);
@@ -92,7 +107,7 @@ export default function BudgetVsActualDepartmentTable() {
       window.clearTimeout(timer);
       observer.disconnect();
     };
-  }, [pathname, view]);
+  }, [pathname]);
 
   return null;
 }
