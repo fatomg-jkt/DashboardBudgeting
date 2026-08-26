@@ -189,6 +189,12 @@ export async function saveReportImport(
       report.imports = report.imports.filter(
         (item) => !isBrokenAnalysisImport(item as { rows?: Record<string, unknown>[] }),
       );
+
+      // Analisa Budget is a current management snapshot, not an accumulating ledger.
+      // Keep only the newest import so re-uploading the same period cannot double the table/chart.
+      if (strategy !== "new") {
+        report.imports = [];
+      }
     }
 
     const old = report.imports.find((item) => item.fileHash === hash);
