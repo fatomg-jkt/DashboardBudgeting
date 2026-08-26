@@ -175,6 +175,13 @@ export default function DashboardBudgetPercentKpis() {
             grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
           }
         }
+
+        /* Keep all KPI values compact enough to stay on one line, especially Variance. */
+        .dashboard-kpi-six-columns > div > p.mt-2 {
+          font-size: 1.35rem !important;
+          line-height: 1.65rem !important;
+          white-space: nowrap;
+        }
       `}</style>
       {cards.map(([label, value]) => (
         <div
