@@ -32,7 +32,10 @@ export async function GET(req: Request) {
     }
 
     const report = await readReport(company as Company, type);
-    const rows = report.imports.flatMap((item) =>
+    const sourceImports =
+      type === "analisis_variance" ? report.imports.slice(-1) : report.imports;
+
+    const rows = sourceImports.flatMap((item) =>
       item.rows.map((row, index) => ({
         ...row,
         importId: item.id,
