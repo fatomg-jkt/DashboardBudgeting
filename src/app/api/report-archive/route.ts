@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { BlobNotConfiguredError, type Company } from "@/lib/blob-reports";
+import { SupabaseNotConfiguredError, type Company } from "@/lib/supabase-reports";
 import { deleteBudgetArchive, listBudgetArchives, saveBudgetArchive } from "@/lib/report-archive";
 
 export const runtime = "nodejs";
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const items = await listBudgetArchives(company);
     return NextResponse.json(items, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    if (error instanceof BlobNotConfiguredError) {
+    if (error instanceof SupabaseNotConfiguredError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
     console.error("List report archive failed.", error);
@@ -58,11 +58,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, item });
   } catch (error) {
-    if (error instanceof BlobNotConfiguredError) {
+    if (error instanceof SupabaseNotConfiguredError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
     console.error("Save report archive failed.", error);
-    return NextResponse.json({ error: "File Excel gagal disimpan." }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "File Excel gagal disimpan." },
+      { status: 500 },
+    );
   }
 }
 
@@ -86,10 +89,13 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    if (error instanceof BlobNotConfiguredError) {
+    if (error instanceof SupabaseNotConfiguredError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
     console.error("Delete report archive failed.", error);
-    return NextResponse.json({ error: "Arsip gagal dihapus." }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Arsip gagal dihapus." },
+      { status: 500 },
+    );
   }
 }
