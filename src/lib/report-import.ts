@@ -1,7 +1,12 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { BlobNotConfiguredError, readReport, writeReport, type Company } from "@/lib/blob-reports";
+import {
+  SupabaseNotConfiguredError,
+  readReport,
+  writeReport,
+  type Company,
+} from "@/lib/supabase-reports";
 import { isReportType } from "@/lib/reports";
 
 export type ImportBody = {
@@ -106,10 +111,10 @@ export async function saveReportImport(
       body: { success: true, id: importId, total: rows.length },
     };
   } catch (error) {
-    if (error instanceof BlobNotConfiguredError) {
+    if (error instanceof SupabaseNotConfiguredError) {
       return {
         status: 503,
-        body: { error: "Penyimpanan bersama belum terhubung. Data belum disimpan." },
+        body: { error: "Supabase belum terhubung. Data belum disimpan." },
       };
     }
 
