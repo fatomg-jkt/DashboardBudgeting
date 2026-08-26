@@ -8,6 +8,7 @@ import DetailBiayaEnhancer from '@/components/detail-biaya-enhancer';
 import DetailBiayaPieChart from '@/components/detail-biaya-pie-chart';
 import SisaBudgetDetailEnhancer from '@/components/sisa-budget-detail-enhancer';
 import SisaBudgetDepartmentChart from '@/components/sisa-budget-department-chart';
+import SisaBudgetDepartmentTable from '@/components/sisa-budget-department-table';
 import BudgetVsActualExtraMenu from '@/components/budget-vs-actual-extra-menu';
 import BudgetVsActualDepartmentTable from '@/components/budget-vs-actual-department-table';
 import MonthlyYtdBudgetReport from '@/components/monthly-ytd-budget-report';
@@ -18,6 +19,7 @@ import RealisasiMenuActiveFix from '@/components/realisasi-menu-active-fix';
 import LaporanBudgetHub from '@/components/laporan-budget-hub';
 import LaporanBudgetArchiveActions from '@/components/laporan-budget-archive-actions';
 import DashboardGraphCenter from '@/components/dashboard-graph-center';
+import DashboardBudgetPercentKpis from '@/components/dashboard-budget-percent-kpis';
 import DashboardSisaBudgetPies from '@/components/dashboard-sisa-budget-pies';
 import DashboardSisaBudgetDetailPies from '@/components/dashboard-sisa-budget-detail-pies';
 import './globals.css';
@@ -56,6 +58,7 @@ export default function RootLayout({
         <DetailBiayaPieChart />
         <SisaBudgetDetailEnhancer />
         <SisaBudgetDepartmentChart />
+        <SisaBudgetDepartmentTable />
         <MonthlyYtdBudgetReport />
         <YtdDetailReportEnhancer />
         <YtdManagementSummary />
@@ -64,6 +67,7 @@ export default function RootLayout({
         <LaporanBudgetHub />
         <LaporanBudgetArchiveActions />
         <DashboardGraphCenter />
+        <DashboardBudgetPercentKpis />
         <DashboardSisaBudgetPies />
         <DashboardSisaBudgetDetailPies />
         {children}
