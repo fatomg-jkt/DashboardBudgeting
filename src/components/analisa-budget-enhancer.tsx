@@ -323,7 +323,7 @@ function UploadModal({
           Object.fromEntries(
             headers.map((header, index) => [
               header || `column_${index + 1}`,
-              numberValue(row[index] ?? ""),
+              row[index] ?? "",
             ]),
           ),
         ) ?? [],

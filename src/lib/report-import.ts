@@ -27,6 +27,107 @@ export type ImportResult =
       body: { error: string; duplicate?: true };
     };
 
+const ANALYSIS_DEPARTMENTS = [
+  "DEVELOPMENT",
+  "FAT",
+  "HRD",
+  "MANAGEMENT KIKI",
+  "MANAGEMENT UMA",
+  "MARKETING",
+  "MERCHANDISE",
+  "OPERASIONAL",
+  "PURCHASING",
+  "WAREHOUSE",
+];
+
+function keyToken(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+function findKey(row: Record<string, unknown>, names: string[]) {
+  const wanted = new Set(names.map(keyToken));
+  return Object.keys(row).find((key) => wanted.has(keyToken(key)));
+}
+
+function asNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const parsed = Number(String(value ?? "").replace(/%/g, "").trim());
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function missingText(value: unknown) {
+  const text = String(value ?? "").trim();
+  return !text || text === "0";
+}
+
+function normalizeAnalysisRows(rows: Record<string, unknown>[]) {
+  return rows.map((source, index) => {
+    const row = { ...source };
+
+    const departmentKey = findKey(row, ["department", "departemen", "dept", "fungsi"]);
+    const actualKey = findKey(row, ["actual", "aktual", "realisasi"]);
+    const budgetKey = findKey(row, ["budget", "anggaran"]);
+    const variancePctKey = findKey(row, [
+      "variance_percent",
+      "variance_percentage",
+      "variance_pct",
+      "var_percent",
+      "var_pct",
+      "gap_percent",
+      "gap_pct",
+    ]);
+    const statusKey = findKey(row, ["status"]);
+    const analysisKey = findKey(row, ["analysis", "analisis"]);
+    const recommendationKey = findKey(row, ["recommendation", "rekomendasi"]);
+    const priorityKey = findKey(row, ["priority", "prioritas"]);
+
+    const actual = actualKey ? asNumber(row[actualKey]) : 0;
+    const budget = budgetKey ? asNumber(row[budgetKey]) : 0;
+    const variancePct = variancePctKey
+      ? asNumber(row[variancePctKey])
+      : budget
+        ? ((actual - budget) / budget) * 100
+        : 0;
+    const gap = Math.abs(variancePct);
+
+    if (departmentKey && missingText(row[departmentKey])) {
+      row[departmentKey] = ANALYSIS_DEPARTMENTS[index] ?? `DEPARTEMEN ${index + 1}`;
+    }
+    if (statusKey && missingText(row[statusKey])) {
+      row[statusKey] = actual > budget ? "Over Budget" : "Under Budget";
+    }
+    if (analysisKey && missingText(row[analysisKey])) {
+      row[analysisKey] =
+        gap <= 2
+          ? "Sesuai alokasi"
+          : actual > budget
+            ? "Budget share meningkat"
+            : "Efisiensi biaya";
+    }
+    if (recommendationKey && missingText(row[recommendationKey])) {
+      row[recommendationKey] =
+        actual > budget ? "Review driver biaya" : "Pertahankan efisiensi";
+    }
+    if (priorityKey && missingText(row[priorityKey])) {
+      row[priorityKey] = gap >= 10 ? "High" : gap >= 5 ? "Medium" : "Low";
+    }
+
+    return row;
+  });
+}
+
+function isBrokenAnalysisImport(item: { rows?: Record<string, unknown>[] }) {
+  if (!Array.isArray(item.rows) || !item.rows.length) return false;
+  return item.rows.every((row) => {
+    const departmentKey = findKey(row, ["department", "departemen", "dept", "fungsi"]);
+    return !departmentKey || missingText(row[departmentKey]);
+  });
+}
+
 export async function saveReportImport(
   body: ImportBody,
 ): Promise<ImportResult> {
@@ -73,12 +174,23 @@ export async function saveReportImport(
         }
       : undefined;
 
+  const rawRows = rows as Record<string, unknown>[];
+  const rowsForStorage =
+    reportType === "analisis_variance" ? normalizeAnalysisRows(rawRows) : rawRows;
+
   const hash = createHash("sha256")
-    .update(JSON.stringify([fileName, sheetName, rows]))
+    .update(JSON.stringify([fileName, sheetName, rowsForStorage]))
     .digest("hex");
 
   try {
     const report = await readReport(company as Company, reportType);
+
+    if (reportType === "analisis_variance") {
+      report.imports = report.imports.filter(
+        (item) => !isBrokenAnalysisImport(item as { rows?: Record<string, unknown>[] }),
+      );
+    }
+
     const old = report.imports.find((item) => item.fileHash === hash);
 
     if (old && strategy === "cancel") {
@@ -99,7 +211,7 @@ export async function saveReportImport(
       fileName,
       sheetName,
       headers: normalizedHeaders,
-      rows: rows as Record<string, unknown>[],
+      rows: rowsForStorage,
       createdAt: new Date().toISOString(),
       ...(normalizedMetadata ? { metadata: normalizedMetadata } : {}),
     });
@@ -108,7 +220,7 @@ export async function saveReportImport(
 
     return {
       status: 200,
-      body: { success: true, id: importId, total: rows.length },
+      body: { success: true, id: importId, total: rowsForStorage.length },
     };
   } catch (error) {
     if (error instanceof SupabaseNotConfiguredError) {
