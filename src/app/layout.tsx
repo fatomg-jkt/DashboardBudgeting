@@ -16,6 +16,7 @@ import YtdDetailReportEnhancer from '@/components/ytd-detail-report-enhancer';
 import YtdManagementSummary from '@/components/ytd-management-summary';
 import RealisasiBudgetEnhancer from '@/components/realisasi-budget-enhancer';
 import RealisasiMenuActiveFix from '@/components/realisasi-menu-active-fix';
+import RealisasiDepartmentFilterPanel from '@/components/realisasi-department-filter-panel';
 import LaporanBudgetHub from '@/components/laporan-budget-hub';
 import LaporanBudgetArchiveActions from '@/components/laporan-budget-archive-actions';
 import DashboardGraphCenter from '@/components/dashboard-graph-center';
@@ -64,6 +65,7 @@ export default function RootLayout({
         <YtdManagementSummary />
         <RealisasiBudgetEnhancer />
         <RealisasiMenuActiveFix />
+        <RealisasiDepartmentFilterPanel />
         <LaporanBudgetHub />
         <LaporanBudgetArchiveActions />
         <DashboardGraphCenter />
