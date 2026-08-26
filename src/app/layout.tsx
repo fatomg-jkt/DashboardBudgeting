@@ -18,6 +18,7 @@ import RealisasiMenuActiveFix from '@/components/realisasi-menu-active-fix';
 import LaporanBudgetHub from '@/components/laporan-budget-hub';
 import LaporanBudgetArchiveActions from '@/components/laporan-budget-archive-actions';
 import DashboardGraphCenter from '@/components/dashboard-graph-center';
+import DashboardBudgetPercentKpis from '@/components/dashboard-budget-percent-kpis';
 import DashboardSisaBudgetPies from '@/components/dashboard-sisa-budget-pies';
 import DashboardSisaBudgetDetailPies from '@/components/dashboard-sisa-budget-detail-pies';
 import './globals.css';
@@ -64,6 +65,7 @@ export default function RootLayout({
         <LaporanBudgetHub />
         <LaporanBudgetArchiveActions />
         <DashboardGraphCenter />
+        <DashboardBudgetPercentKpis />
         <DashboardSisaBudgetPies />
         <DashboardSisaBudgetDetailPies />
         {children}
