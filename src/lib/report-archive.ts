@@ -1,7 +1,12 @@
 import "server-only";
 
-import { del, get, put } from "@vercel/blob";
-import { BlobNotConfiguredError, blobToken, type Company } from "@/lib/blob-reports";
+import {
+  readReport,
+  writeReport,
+  SupabaseNotConfiguredError,
+  type Company,
+  type StoredImport,
+} from "@/lib/supabase-reports";
 
 export type BudgetArchiveItem = {
   id: string;
@@ -14,51 +19,72 @@ export type BudgetArchiveItem = {
   createdAt: string;
 };
 
-type BudgetArchiveIndex = {
-  version: 1;
-  items: BudgetArchiveItem[];
-};
+const REPORT_TYPE = "laporan_budget_upload" as const;
 
-const indexPath = (company: Company) => `budgeting/v1/${company}/laporan-budget-archive.json`;
+function getConfig() {
+  const url = process.env.SUPABASE_URL?.trim().replace(/\/$/, "");
+  const key = process.env.SUPABASE_SECRET_KEY?.trim();
+  const bucket = process.env.SUPABASE_STORAGE_BUCKET?.trim();
+  if (!url || !key || !bucket) {
+    throw new SupabaseNotConfiguredError(
+      "Supabase Storage belum dikonfigurasi. Pastikan SUPABASE_URL, SUPABASE_SECRET_KEY, dan SUPABASE_STORAGE_BUCKET tersedia di Vercel.",
+    );
+  }
+  return { url, key, bucket };
+}
+
+function authHeaders(key: string, extra?: Record<string, string>) {
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    ...extra,
+  };
+}
+
+function encodeStoragePath(path: string) {
+  return path
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+}
 
 function safeName(name: string) {
   const cleaned = name.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
   return cleaned || "laporan.xlsx";
 }
 
-async function readIndex(company: Company): Promise<BudgetArchiveIndex> {
-  const token = blobToken();
-  if (!token) throw new BlobNotConfiguredError("Vercel Blob belum dikonfigurasi.");
-
-  const result = await get(indexPath(company), {
-    access: "private",
-    token,
-    useCache: false,
-  });
-
-  if (!result) return { version: 1, items: [] };
-  const value = (await new Response(result.stream).json()) as BudgetArchiveIndex;
-  return value?.version === 1 && Array.isArray(value.items)
-    ? value
-    : { version: 1, items: [] };
+function toArchiveItem(item: StoredImport): BudgetArchiveItem | null {
+  const storagePath = item.metadata?.storagePath?.trim();
+  if (!storagePath) return null;
+  return {
+    id: item.id,
+    periode: item.metadata?.periode?.trim() || "-",
+    keterangan: item.metadata?.keterangan?.trim() || item.fileName,
+    fileName: item.metadata?.originalFileName?.trim() || item.fileName,
+    storagePath,
+    contentType: item.metadata?.contentType?.trim() || "application/octet-stream",
+    size: Number(item.metadata?.size ?? 0),
+    createdAt: item.createdAt,
+  };
 }
 
-async function writeIndex(company: Company, index: BudgetArchiveIndex) {
-  const token = blobToken();
-  if (!token) throw new BlobNotConfiguredError("Vercel Blob belum dikonfigurasi.");
-
-  await put(indexPath(company), JSON.stringify(index), {
-    access: "private",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-    token,
-  });
+async function storageRequest(url: string, init: RequestInit) {
+  const response = await fetch(url, { ...init, cache: "no-store" });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(
+      `Supabase Storage ${response.status} ${response.statusText}${detail ? `: ${detail}` : ""}`,
+    );
+  }
+  return response;
 }
 
 export async function listBudgetArchives(company: Company) {
-  const index = await readIndex(company);
-  return [...index.items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const report = await readReport(company, REPORT_TYPE);
+  return report.imports
+    .map(toArchiveItem)
+    .filter((item): item is BudgetArchiveItem => item !== null)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function saveBudgetArchive(args: {
@@ -67,70 +93,82 @@ export async function saveBudgetArchive(args: {
   keterangan: string;
   file: File;
 }) {
-  const token = blobToken();
-  if (!token) throw new BlobNotConfiguredError("Vercel Blob belum dikonfigurasi.");
-
+  const { url, key, bucket } = getConfig();
   const id = crypto.randomUUID();
   const fileName = args.file.name || "laporan.xlsx";
-  const storagePath = `budgeting/v1/${args.company}/archives/${id}-${safeName(fileName)}`;
+  const storagePath = `budgeting/${args.company}/archives/${id}-${safeName(fileName)}`;
   const bytes = await args.file.arrayBuffer();
+  const contentType = args.file.type || "application/octet-stream";
 
-  await put(storagePath, bytes, {
-    access: "private",
-    addRandomSuffix: false,
-    allowOverwrite: false,
-    contentType: args.file.type || "application/octet-stream",
-    token,
-  });
+  await storageRequest(
+    `${url}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeStoragePath(storagePath)}`,
+    {
+      method: "POST",
+      headers: authHeaders(key, {
+        "Content-Type": contentType,
+        "x-upsert": "false",
+        "cache-control": "3600",
+      }),
+      body: bytes,
+    },
+  );
 
-  const item: BudgetArchiveItem = {
+  const report = await readReport(args.company, REPORT_TYPE);
+  const stored: StoredImport = {
     id,
-    periode: args.periode,
-    keterangan: args.keterangan,
+    fileHash: `archive-${id}`,
     fileName,
-    storagePath,
-    contentType: args.file.type || "application/octet-stream",
-    size: args.file.size,
+    sheetName: "FILE",
+    headers: [],
+    rows: [],
     createdAt: new Date().toISOString(),
+    metadata: {
+      periode: args.periode,
+      keterangan: args.keterangan,
+      storagePath,
+      originalFileName: fileName,
+      contentType,
+      size: args.file.size,
+    },
   };
+  report.imports.push(stored);
+  await writeReport(args.company, REPORT_TYPE, report);
 
-  const index = await readIndex(args.company);
-  index.items.push(item);
-  await writeIndex(args.company, index);
-  return item;
+  return toArchiveItem(stored)!;
 }
 
 export async function getBudgetArchive(company: Company, id: string) {
-  const token = blobToken();
-  if (!token) throw new BlobNotConfiguredError("Vercel Blob belum dikonfigurasi.");
-
-  const index = await readIndex(company);
-  const item = index.items.find((entry) => entry.id === id);
+  const { url, key, bucket } = getConfig();
+  const report = await readReport(company, REPORT_TYPE);
+  const stored = report.imports.find((entry) => entry.id === id);
+  const item = stored ? toArchiveItem(stored) : null;
   if (!item) return null;
 
-  const result = await get(item.storagePath, {
-    access: "private",
-    token,
-    useCache: false,
-  });
-  if (!result) return null;
+  const response = await storageRequest(
+    `${url}/storage/v1/object/authenticated/${encodeURIComponent(bucket)}/${encodeStoragePath(item.storagePath)}`,
+    {
+      method: "GET",
+      headers: authHeaders(key),
+    },
+  );
 
-  return { item, stream: result.stream };
+  return { item, stream: response.body };
 }
 
 export async function deleteBudgetArchive(company: Company, id: string) {
-  const token = blobToken();
-  if (!token) throw new BlobNotConfiguredError("Vercel Blob belum dikonfigurasi.");
-
-  const index = await readIndex(company);
-  const item = index.items.find((entry) => entry.id === id);
+  const { url, key, bucket } = getConfig();
+  const report = await readReport(company, REPORT_TYPE);
+  const stored = report.imports.find((entry) => entry.id === id);
+  const item = stored ? toArchiveItem(stored) : null;
   if (!item) return false;
 
-  await del(item.storagePath, { token });
-  await writeIndex(company, {
-    version: 1,
-    items: index.items.filter((entry) => entry.id !== id),
+  await storageRequest(`${url}/storage/v1/object/${encodeURIComponent(bucket)}`, {
+    method: "DELETE",
+    headers: authHeaders(key, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ prefixes: [item.storagePath] }),
   });
 
+  report.imports = report.imports.filter((entry) => entry.id !== id);
+  await writeReport(company, REPORT_TYPE, report);
   return true;
 }
