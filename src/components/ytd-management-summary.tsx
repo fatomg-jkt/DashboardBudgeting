@@ -62,22 +62,35 @@ export default function YtdManagementSummary() {
     setMount(node);
   }, [active]);
 
-  const loadRows = useCallback(async () => {
+  const loadRows = useCallback(async function loadRows(attempt = 0) {
     if (!active) return;
     try {
       const response = await fetch(`/api/reports?reportType=cumulative_budget_actual_ytd&company=${company}`, { cache: "no-store" });
       const payload: unknown = await response.json();
-      if (!response.ok || !Array.isArray(payload)) return setRows([]);
-      setRows(payload.map((raw) => {
+      if (!response.ok || !Array.isArray(payload)) throw new Error("Data YTD belum siap dibaca.");
+
+      const parsed = payload.map((raw) => {
         const row = raw as ApiRow;
         return {
           department: String(pick(row, ["department", "departemen", "dept"]) ?? "LAINNYA").trim().toUpperCase() || "LAINNYA",
           budget: num(pick(row, ["budget", "anggaran"])),
           actual: num(pick(row, ["realisasi", "actual", "aktual"])),
         };
-      }));
+      });
+
+      setRows(parsed);
+
+      // The detailed YTD report can finish loading a moment after this summary mounts.
+      // Retry a couple of times only when no rows are available, avoiding continuous polling.
+      if (parsed.length === 0 && attempt < 2) {
+        window.setTimeout(() => void loadRows(attempt + 1), 600 * (attempt + 1));
+      }
     } catch {
-      setRows([]);
+      if (attempt < 2) {
+        window.setTimeout(() => void loadRows(attempt + 1), 600 * (attempt + 1));
+      } else {
+        setRows([]);
+      }
     }
   }, [active, company]);
 
@@ -85,15 +98,45 @@ export default function YtdManagementSummary() {
     if (!active) return;
     syncCompany();
     attach();
+
     const observer = new MutationObserver(() => attach());
     observer.observe(document.body, { childList: true, subtree: true });
-    const click = () => window.setTimeout(() => { syncCompany(); attach(); }, 0);
+
+    const click = (event: MouseEvent) => {
+      const button = (event.target as HTMLElement | null)?.closest("button");
+      const label = button?.textContent?.toLowerCase().trim() ?? "";
+
+      window.setTimeout(() => {
+        syncCompany();
+        attach();
+      }, 0);
+
+      // Refresh the management summary after a YTD import is saved on this page.
+      if (label.includes("import") && label.includes("simpan")) {
+        [700, 1600, 3200].forEach((delay) => {
+          window.setTimeout(() => void loadRows(), delay);
+        });
+      }
+    };
+
+    const refresh = () => void loadRows();
+    const visibility = () => {
+      if (document.visibilityState === "visible") void loadRows();
+    };
+
     document.addEventListener("click", click, true);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    document.addEventListener("visibilitychange", visibility);
+
     return () => {
       observer.disconnect();
       document.removeEventListener("click", click, true);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", refresh);
+      document.removeEventListener("visibilitychange", visibility);
     };
-  }, [active, attach, syncCompany]);
+  }, [active, attach, loadRows, syncCompany]);
 
   useEffect(() => { void loadRows(); }, [loadRows]);
 
