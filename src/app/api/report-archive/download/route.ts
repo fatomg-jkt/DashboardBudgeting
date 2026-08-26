@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { BlobNotConfiguredError, type Company } from "@/lib/blob-reports";
+import { SupabaseNotConfiguredError, type Company } from "@/lib/supabase-reports";
 import { getBudgetArchive } from "@/lib/report-archive";
 
 export const runtime = "nodejs";
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     }
 
     const archive = await getBudgetArchive(company, id);
-    if (!archive) {
+    if (!archive || !archive.stream) {
       return NextResponse.json({ error: "File arsip tidak ditemukan." }, { status: 404 });
     }
 
@@ -35,10 +35,13 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    if (error instanceof BlobNotConfiguredError) {
+    if (error instanceof SupabaseNotConfiguredError) {
       return NextResponse.json({ error: error.message }, { status: 503 });
     }
     console.error("Download report archive failed.", error);
-    return NextResponse.json({ error: "File arsip gagal diunduh." }, { status: 500 });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "File arsip gagal diunduh." },
+      { status: 500 },
+    );
   }
 }
