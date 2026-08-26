@@ -18,6 +18,19 @@ export function detectHeaderRow(rows: string[][]) {
 const detailHeader = 'Periode,Deskripsi (COA),DEVELOPMENT - Anggaran,DEVELOPMENT - Aktual,FAT - Anggaran,FAT - Aktual,HRD - Anggaran,HRD - Aktual,MANAGEMENT KIKI - Anggaran,MANAGEMENT KIKI - Aktual,MANAGEMENT UMA - Anggaran,MANAGEMENT UMA - Aktual,MARKETING - Anggaran,MARKETING - Aktual,MERCHANDISE - Anggaran,MERCHANDISE - Aktual,OPERASIONAL - Anggaran,OPERASIONAL - Aktual,PURCHASING - Anggaran,PURCHASING - Aktual,WAREHOUSE - Anggaran,WAREHOUSE - Aktual';
 const detailExample = 'Januari,Beban Amortisasi Asuransi,4200000,8344373,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0';
 
+const budgetVsActualDepartmentExample = [
+  '2026,Januari - Desember,WAREHOUSE,Update Per Juni,55200000,18183659,-37016341,-67%',
+  '2026,Januari - Desember,PURCHASING,Update Per Juni,132000000,78109628,-53890372,-41%',
+  '2026,Januari - Desember,OPERASIONAL,Update Per Juni,913141320,439768114,-473373206,-52%',
+  '2026,Januari - Desember,MERCHANDISE,Update Per Juni,1278758688,394988986,-883769702,-69%',
+  '2026,Januari - Desember,MARKETING,Update Per Juni,882400000,422167736,-460232264,-52%',
+  '2026,Januari - Desember,MANAGEMENT UMA,Update Per Juni,1200000,3631186,2431186,203%',
+  '2026,Januari - Desember,MANAGEMENT KIKI,Update Per Juni,386400000,177031976,-209368024,-54%',
+  '2026,Januari - Desember,HRD,Update Per Juni,1318299996,814205602,-504094394,-38%',
+  '2026,Januari - Desember,FAT,Update Per Juni,316999992,158626525,-158373467,-50%',
+  '2026,Januari - Desember,DEVELOPMENT,Update Per Juni,4200000,9473918,5273918,126%',
+].join('\r\n');
+
 const analysisExample = [
   '2026,Juni,DEVELOPMENT,8344373,4200000,4144373,98.7%,198.7%,Over Budget,Sesuai alokasi,Review driver biaya,High',
   '2026,Juni,FAT,161093491,159249996,1843495,1.2%,101.2%,Over Budget,Sesuai alokasi,Review driver biaya,High',
@@ -33,7 +46,7 @@ const analysisExample = [
 
 export const templates: Record<ReportType, { header: string; example: string; filename: string }> = {
   budget_planning:{header:'tahun,bulan,department,category,budget,keterangan',example:'2026,Januari,WAREHOUSE,Operasional,55200000,Rencana tahunan',filename:'template-budget-planning.csv'},
-  budget_vs_actual:{header:'tahun,bulan,department,category,budget,actual',example:'2026,Januari,WAREHOUSE,Operasional,55200000,18183659',filename:'template-budget-vs-actual.csv'},
+  budget_vs_actual:{header:'tahun,bulan,departemen,Status Data,budget,actual,variance,%',example:budgetVsActualDepartmentExample,filename:'template-budget-vs-actual-per-departemen.csv'},
   monthly_budget_actual:{header:'Tahun,Bulan,Budget,Actual,Selisih %,Status',example:'2026,April,1267433332,1651087912,30.27%,Over Budget',filename:'template-monthly-budget-vs-actual.csv'},
   cumulative_budget_actual_ytd:{header:'Perusahaan,Tahun,Bulan,Department,Cost Center,Kode Akun,Nama Akun,Kategori,Budget,Realisasi',example:'1001,2026,Januari,Marketing,MKT-01,6201,Iklan Digital,OPEX,600000000,500000000',filename:'template-cumulative-budget-vs-actual-ytd.csv'},
   realisasi_budget:{header:'tahun,bulan,department,category,actual,keterangan',example:'2026,Januari,WAREHOUSE,Operasional,18183659,Realisasi Januari',filename:'template-realisasi-budget.csv'},

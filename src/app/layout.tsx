@@ -9,6 +9,7 @@ import DetailBiayaPieChart from '@/components/detail-biaya-pie-chart';
 import SisaBudgetDetailEnhancer from '@/components/sisa-budget-detail-enhancer';
 import SisaBudgetDepartmentChart from '@/components/sisa-budget-department-chart';
 import BudgetVsActualExtraMenu from '@/components/budget-vs-actual-extra-menu';
+import BudgetVsActualDepartmentTable from '@/components/budget-vs-actual-department-table';
 import MonthlyYtdBudgetReport from '@/components/monthly-ytd-budget-report';
 import YtdDetailReportEnhancer from '@/components/ytd-detail-report-enhancer';
 import YtdManagementSummary from '@/components/ytd-management-summary';
@@ -47,6 +48,7 @@ export default function RootLayout({
       <body style={{ fontFamily: 'var(--font-body), sans-serif' }}>
         <MenuAdjuster />
         <BudgetVsActualExtraMenu />
+        <BudgetVsActualDepartmentTable />
         <MonitoringMenuHider />
         <AnalisaBudgetEnhancer />
         <AnalisaBudgetRouteSync />
