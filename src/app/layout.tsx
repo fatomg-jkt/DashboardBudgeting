@@ -25,6 +25,7 @@ import DashboardGraphCenter from '@/components/dashboard-graph-center';
 import DashboardBudgetPercentKpis from '@/components/dashboard-budget-percent-kpis';
 import DashboardSisaBudgetPies from '@/components/dashboard-sisa-budget-pies';
 import DashboardSisaBudgetDetailPies from '@/components/dashboard-sisa-budget-detail-pies';
+import DepartmentBudgetKpis from '@/components/department-budget-kpis';
 import ImportPasswordGate from '@/components/import-password-gate';
 import './globals.css';
 import './branding-fix.css';
@@ -77,6 +78,7 @@ export default function RootLayout({
         <DashboardBudgetPercentKpis />
         <DashboardSisaBudgetPies />
         <DashboardSisaBudgetDetailPies />
+        <DepartmentBudgetKpis />
         <ImportPasswordGate />
         {children}
         <style>{`
