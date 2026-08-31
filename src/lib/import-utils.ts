@@ -31,6 +31,7 @@ const budgetVsActualDepartmentExample = [
   '2026,Januari - Desember,DEVELOPMENT,Update Per Juni,4200000,9473918,5273918,126%',
 ].join('\r\n');
 
+const analysisHeader = 'Tahun,Bulan,Departemen,Aktual,Anggaran,Variance (Rp),Variance (%),Utilization,Status,Analisis,Rekomendasi,Prioritas';
 const analysisExample = [
   '2026,Juni,DEVELOPMENT,8344373,4200000,4144373,98.7%,198.7%,Over Budget,Sesuai alokasi,Review driver biaya,High',
   '2026,Juni,FAT,161093491,159249996,1843495,1.2%,101.2%,Over Budget,Sesuai alokasi,Review driver biaya,High',
@@ -54,7 +55,9 @@ export const templates: Record<ReportType, { header: string; example: string; fi
   realisasi_per_departemen:{header:'Tahun,Bulan,Departemen,Realisasi,Kategori,Keterangan',example:'2026,Januari,WAREHOUSE,18183659,Operasional,Realisasi Januari',filename:'template-laporan-realisasi-per-departemen.csv'},
   monitoring_budget:{header:'tahun,bulan,department,budget,actual,status',example:'2026,Januari,WAREHOUSE,55200000,18183659,Aman',filename:'template-monitoring-budget.csv'},
   pengajuan_budget:{header:'tanggal,department,category,nominal,keterangan,pic,status',example:'2026-01-15,WAREHOUSE,Operasional,10000000,Pembelian perlengkapan,Budi,Draft',filename:'template-pengajuan-budget.csv'},
-  analisis_variance:{header:'Tahun,Bulan,Departemen,Aktual,Anggaran,Variance (Rp),Variance (%),Utilization,Status,Analisis,Rekomendasi,Prioritas',example:analysisExample,filename:'template-analisa-budget.csv'},
+  analisis_variance:{header:analysisHeader,example:analysisExample,filename:'template-analisa-budget.csv'},
+  analisis_variance_current_month:{header:analysisHeader,example:analysisExample,filename:'template-analisa-budget-current-month.csv'},
+  analisis_variance_through_december:{header:analysisHeader,example:analysisExample,filename:'template-analisa-budget-through-december.csv'},
   laporan_budget:{header:'Tahun,Bulan,Departemen,Total Budget,Total Aktual,Sisa Budget,Variance %',example:'2026,Juni,WAREHOUSE,55200000,18183659,37016341,67%',filename:'template-laporan-sisa-budget-per-departemen.csv'},
   laporan_budget_upload:{header:'Judul Laporan,Periode,Keterangan,Nilai',example:'Laporan Management,Juni 2026,Contoh data,1000000',filename:'template-laporan-budget-umum.csv'},
   budget_detail_biaya:{header:detailHeader,example:detailExample,filename:'template-laporan-detail-biaya-semua-departemen.csv'},
