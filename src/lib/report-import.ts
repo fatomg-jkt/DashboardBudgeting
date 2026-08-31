@@ -40,6 +40,12 @@ const ANALYSIS_DEPARTMENTS = [
   "WAREHOUSE",
 ];
 
+const ANALYSIS_REPORT_TYPES = new Set([
+  "analisis_variance",
+  "analisis_variance_current_month",
+  "analisis_variance_through_december",
+]);
+
 function keyToken(value: string) {
   return value
     .toLowerCase()
@@ -175,8 +181,8 @@ export async function saveReportImport(
       : undefined;
 
   const rawRows = rows as Record<string, unknown>[];
-  const rowsForStorage =
-    reportType === "analisis_variance" ? normalizeAnalysisRows(rawRows) : rawRows;
+  const isAnalysisReport = ANALYSIS_REPORT_TYPES.has(String(reportType));
+  const rowsForStorage = isAnalysisReport ? normalizeAnalysisRows(rawRows) : rawRows;
 
   const hash = createHash("sha256")
     .update(JSON.stringify([fileName, sheetName, rowsForStorage]))
@@ -185,13 +191,13 @@ export async function saveReportImport(
   try {
     const report = await readReport(company as Company, reportType);
 
-    if (reportType === "analisis_variance") {
+    if (isAnalysisReport) {
       report.imports = report.imports.filter(
         (item) => !isBrokenAnalysisImport(item as { rows?: Record<string, unknown>[] }),
       );
 
-      // Analisa Budget is a current management snapshot, not an accumulating ledger.
-      // Keep only the newest import so re-uploading the same period cannot double the table/chart.
+      // Each Analisa Budget submenu is an independent management snapshot.
+      // Re-uploading replaces only that submenu's own data, never the other submenu.
       if (strategy !== "new") {
         report.imports = [];
       }
