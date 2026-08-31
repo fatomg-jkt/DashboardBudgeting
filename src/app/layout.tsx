@@ -5,6 +5,7 @@ import MonitoringMenuHider from '@/components/monitoring-menu-hider';
 import AnalisaBudgetEnhancer from '@/components/analisa-budget-enhancer';
 import AnalisaBudgetRouteSync from '@/components/analisa-budget-route-sync';
 import AnalisaBudgetSubmenuReports from '@/components/analisa-budget-submenu-reports';
+import AnalisaBudgetSubmenuFormat from '@/components/analisa-budget-submenu-format';
 import DetailBiayaEnhancer from '@/components/detail-biaya-enhancer';
 import DetailBiayaPieChart from '@/components/detail-biaya-pie-chart';
 import SisaBudgetDetailEnhancer from '@/components/sisa-budget-detail-enhancer';
@@ -58,6 +59,7 @@ export default function RootLayout({
         <AnalisaBudgetEnhancer />
         <AnalisaBudgetRouteSync />
         <AnalisaBudgetSubmenuReports />
+        <AnalisaBudgetSubmenuFormat />
         <DetailBiayaEnhancer />
         <DetailBiayaPieChart />
         <SisaBudgetDetailEnhancer />
