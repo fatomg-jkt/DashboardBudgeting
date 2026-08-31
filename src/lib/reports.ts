@@ -7,6 +7,8 @@ export const REPORTS = {
   monitoring_budget: 'Monitoring Budget',
   pengajuan_budget: 'Pengajuan Budget',
   analisis_variance: 'Analisis Variance',
+  analisis_variance_current_month: 'Analisa Budget - Current Month Report',
+  analisis_variance_through_december: 'Analisa Budget - Through December Report',
   laporan_budget: 'Laporan Budget',
   laporan_budget_upload: 'Laporan Excel Tersimpan',
   budget_detail_biaya: 'Laporan Per Detail Biaya',
