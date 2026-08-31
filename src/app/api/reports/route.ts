@@ -4,6 +4,12 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+const ANALYSIS_REPORT_TYPES = new Set([
+  "analisis_variance",
+  "analisis_variance_current_month",
+  "analisis_variance_through_december",
+]);
+
 function keyPart(value: unknown) {
   return String(value ?? "")
     .trim()
@@ -32,8 +38,9 @@ export async function GET(req: Request) {
     }
 
     const report = await readReport(company as Company, type);
-    const sourceImports =
-      type === "analisis_variance" ? report.imports.slice(-1) : report.imports;
+    const sourceImports = ANALYSIS_REPORT_TYPES.has(type)
+      ? report.imports.slice(-1)
+      : report.imports;
 
     const rows = sourceImports.flatMap((item) =>
       item.rows.map((row, index) => ({
