@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -888,6 +889,15 @@ export default function DashboardApp() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,#3a2a08,transparent_35%),#070707] text-slate-100">
       <aside className="fixed inset-y-0 left-0 z-20 hidden w-72 border-r border-gold-500/20 bg-black/95 p-5 lg:block">
         <div className="mb-7 rounded-2xl border border-gold-500/30 bg-gold-500/10 p-4">
+          {company === "1001" && (
+            <Image
+              src="/logo-1001.jpg"
+              alt="Logo 1001"
+              width={96}
+              height={80}
+              className="mx-auto mb-2 h-20 w-full max-w-24 object-contain object-center"
+            />
+          )}
           <p className="text-xs uppercase tracking-[.3em] text-gold-300">
             Budgeting
           </p>
