@@ -1,0 +1,20 @@
+/* Company logo switch only. Keeps all other sidebar styling and behavior unchanged. */
+
+/* 1001 remains the default logo provided by branding-fix.css. */
+aside:has(> div:nth-child(2) button:first-child.bg-gold-500) > div:first-child::before {
+  content: "";
+  display: block;
+}
+
+/* When Maison Y is active, replace the 1001 logo with the Maison Y logo. */
+aside:has(> div:nth-child(2) button:nth-child(2).bg-gold-500) > div:first-child::before {
+  content: "";
+  display: block;
+  width: 120px;
+  height: 100px;
+  margin: 0 auto 10px;
+  background-image: url('/logo-maison-y.jpg') !important;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}

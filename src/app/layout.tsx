@@ -29,6 +29,7 @@ import DepartmentBudgetKpis from '@/components/department-budget-kpis';
 import ImportPasswordGate from '@/components/import-password-gate';
 import './globals.css';
 import './branding-fix.css';
+import './company-logo-switch.css';
 
 const archivo = Archivo({
   subsets: ['latin'],
