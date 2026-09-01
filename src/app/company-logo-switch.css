@@ -14,7 +14,7 @@ aside:has(> div:nth-child(2) button:nth-child(2).bg-gold-500) > div:first-child:
   height: 100px;
   margin: 0 auto 10px;
   background-image: url('/logo-maison-y.jpg') !important;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  background-size: contain !important;
 }
