@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Playfair_Display, Public_Sans } from 'next/font/google';
+import { Archivo, DM_Mono } from 'next/font/google';
 import MenuAdjuster from '@/components/menu-adjuster';
 import MonitoringMenuHider from '@/components/monitoring-menu-hider';
 import AnalisaBudgetEnhancer from '@/components/analisa-budget-enhancer';
@@ -30,29 +30,30 @@ import ImportPasswordGate from '@/components/import-password-gate';
 import './globals.css';
 import './branding-fix.css';
 
-const playfairDisplay = Playfair_Display({
+const archivo = Archivo({
   subsets: ['latin'],
-  variable: '--font-title',
+  variable: '--font-primary',
   display: 'swap',
 });
 
-const publicSans = Public_Sans({
+const dmMono = DM_Mono({
   subsets: ['latin'],
-  variable: '--font-body',
+  weight: ['300', '400', '500'],
+  variable: '--font-mono',
   display: 'swap',
 });
 
 export const metadata: Metadata = {
   title: 'Dashboard Budgeting',
-  description: 'Black & Gold budgeting dashboard',
+  description: 'Budgeting dashboard for 1001 & Maison Y',
 };
 
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="id" className={`${playfairDisplay.variable} ${publicSans.variable}`}>
-      <body style={{ fontFamily: 'var(--font-body), sans-serif' }}>
+    <html lang="id" className={`${archivo.variable} ${dmMono.variable}`}>
+      <body>
         <MenuAdjuster />
         <BudgetVsActualExtraMenu />
         <BudgetVsActualDepartmentTable />
@@ -81,21 +82,6 @@ export default function RootLayout({
         <DepartmentBudgetKpis />
         <ImportPasswordGate />
         {children}
-        <style>{`
-          h1, h2, h3 {
-            font-family: var(--font-title), serif;
-          }
-
-          /* Restore the original dark dashboard background. */
-          body > div.min-h-screen,
-          main {
-            background: #070707 !important;
-          }
-
-          aside.fixed.inset-y-0.left-0 {
-            background: #171717 !important;
-          }
-        `}</style>
       </body>
     </html>
   );
