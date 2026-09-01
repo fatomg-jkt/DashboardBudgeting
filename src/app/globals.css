@@ -253,18 +253,6 @@ aside > div:first-child {
   border-radius: var(--radius-control) !important;
 }
 
-aside > div:first-child::before {
-  content: "";
-  display: block;
-  width: 82px;
-  height: 82px;
-  margin: 0 auto 8px;
-  background-image: url('/logo-1001.jpg');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
-}
-
 main section,
 main .rounded-2xl,
 main .rounded-xl { box-shadow: none !important; }
@@ -275,12 +263,21 @@ main .rounded-xl:not(button):not(input):not(select):not(textarea) {
   border-radius: var(--radius-content) !important;
 }
 
-main .bg-zinc-950,
-main .bg-black,
-main .from-zinc-950,
-main .to-black {
-  background: transparent !important;
+/* Convert remaining neutral black/dark content surfaces to cream. Sidebar is intentionally excluded. */
+main [class*="bg-zinc-950"],
+main [class*="bg-zinc-900"],
+main [class*="bg-zinc-800"],
+main [class*="bg-neutral-950"],
+main [class*="bg-neutral-900"],
+main [class*="bg-black"],
+main [class*="from-zinc-950"],
+main [class*="to-black"],
+.monthly-ytd-budget-root [class*="bg-zinc-950"],
+.monthly-ytd-budget-root [class*="bg-zinc-900"],
+.monthly-ytd-budget-root [class*="bg-black"] {
+  background: var(--bone) !important;
   background-image: none !important;
+  color: var(--ink) !important;
 }
 
 main [class*="bg-gradient"] { background-image: none !important; }
